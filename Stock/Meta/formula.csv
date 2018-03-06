@@ -1,0 +1,68 @@
+target,indicia,prelude,finale,duration,equation,flag,comment
+FinanceExpense,,,,,interest_expense -interest_income+commission_expense-commission_income-exchange_income,addOnly,
+IC,,,,,total_assets-total_current_liability+shortterm_loan+non_current_liability_in_one_year+notes_payable,addOnly,资产总计 -流动负 债+应付票据 +短期借款 +一年内到期 的长负债
+OperatingCapital,,,,,total_assets-total_current_liability,addOnly,
+LongtermCapital,,,,,total_owner_equities+total_non_current_liability,addOnly,非流动负债平均余额+所有者权益平均余额
+CompanyValue,,,,,market_cap+total_liability-cash_at_end,addOnly,
+Accrual,,,,,net_profit-net_operate_cash_flow,addOnly,
+NOA,,,,,fixed_assets+total_current_assets-total_current_liability,addOnly,
+EBI,,,,,net_profit+FinanceExpense,addOnly,（净利润 +财务费用 ）
+EBIT,,,,,"net_profit+interest_expense+income_tax_expense
+",addOnly,EBIT=净利润+所得税+利息
+EBITDA,,,,,"net_profit+interest_expense+income_tax_expense+depreciation+intangible_assets_amortization
+",addOnly,EBITDA=净利润+所得税+利息+折旧+摊销
+TATAsum,,,,,total_current_assets-cash_at_end-total_current_liability+non_current_liability_in_one_year+taxs_payable,addOnly,
+MTA,,,,,total_liability+market_cap,addOnly,总资产市值= 权益的市值+ 总负债
+PE,key,year,,,market_cap/net_profit,value,
+VE,key,year,,,CompanyValue/EBITDA,value,
+ROE,key,year,,,net_profit/total_owner_equities,value,
+PM,,quarter,,,(operating_revenue-operating_cost)/operating_revenue,经营效率,
+ATO,key,quarter,,,operating_revenue/NOA,经营效率,
+RNOA,key,quarter,,,(operating_revenue-operating_cost)/NOA,经营效率,
+ROA,key,quarter,,,net_profit/total_assets,盈利能力,
+ROC,key,quarter,,,EBI/LongtermCapital,盈利能力,（利润总额 +财务费用 ）／长期资本额
+ROIC,key,quarter,,,EBI/IC,盈利能力,
+GrossMargin,,quarter,,,(operating_revenue-operating_cost)/operating_revenue,盈利能力,
+ROA8yr,key,,percent_geometric,32,ROA,盈利能力,
+ROC8yr,key,,percent_geometric,32,ROC,盈利能力,
+ROIC8yr,key,,percent_geometric,32,ROIC,盈利能力,
+MG,key,,change,2,GrossMargin,盈利能力,
+MG8yr,key,,percent_geometric,32,MG,盈利能力,
+Gmmean,,,mean,32,GrossMargin,盈利能力,
+Gmsd,,,sd,32,GrossMargin,盈利能力,
+MS,key,,,,Gmmean/Gmsd,盈利能力,
+DSRI,,quarter,change,2,(account_receivable-accounts_payable)/operating_revenue,盈余质量,
+GMI,,quarter,change,2,operating_revenue/(operating_revenue-operating_cost),盈余质量,
+AQI,,quarter,change,2,1-(total_current_assets+fixed_assets+longterm_equity_invest)/total_assets,盈余质量,
+SGI,,quarter,change,2,operating_revenue,盈余质量,
+DEPI,,quarter,change,2,(depreciation+fixed_assets)/depreciation,盈余质量,
+SGAI,,quarter,change,2,(sale_expense+administration_expense)/operating_revenue,盈余质量,
+LVGI,,quarter,change,2,(longterm_loan+longterm_account_payable+total_current_liability)/total_assets,盈余质量,
+TATAinc,,quarter,inc,2,TATAsum,盈余质量,
+TATA,,,,,(TATAinc-depreciation)/total_assets,盈余质量,
+Mscore,,,,,0.92*DSRI+0.528*GMI+0.404*AQI+0.892*SGI+0.115*DEPI-0.172*SGAI+4.679*TATA-0.327*LVGI-4.84,盈余质量,>-2.22 存在利润操纵风险
+X1,,year,,,OperatingCapital/total_assets,盈余质量,
+X2,,year,,,(surplus_reserve_fund+retained_profit)/total_assets,盈余质量,
+X3,,year,,,EBIT/total_assets,盈余质量,
+X4,,year,,,market_cap/total_liability,盈余质量,
+X5,,year,,,operating_revenue/total_assets,盈余质量,
+Zscore,,,,,1.2*X1+1.4*X2+3.3*X3+0.6*X4+0.999*X5,盈余质量,<1.81 破产风险 >2.99 安全
+NIMTA,,quarter,sum,2,net_profit/MTA,CHS,
+FI,,,,,2**(-1/3),CHS,
+NIMTAAVG,,,decline_avg,10,NIMTA*(1-FI**3)/(1-FI**12),CHS,
+TLMTA,,quarter,,,total_liability/MTA,CHS,
+CASHMTA,,quarter,,,cash_equivalents_at_end/MTA,CHS,
+Index_ReturnMonthly,,,change,20,close,CHS,
+Index_MarketSize,,,,,market_cap,CHS,
+Rmonthly,,,change,20,close,CHS,
+EXERT,,,,,math.log10(1+Rmonthly)-math.log10(1+Index_ReturnMonthly),CHS,
+EXERTAVG,,,decline_avg,12,EXERT*(1-FI)/(1-FI**12),CHS,
+RSIZE,,,,,math.log10(market_cap/Index_MarketSize),CHS,
+MB,,,,,market_cap/total_owner_equities,CHS,
+PRICE,,,,,math.log10(close),CHS,
+SIGMA,,,vix_yearly,90,change_rate,CHS,
+LPFD,,,,,1.42*TLMTA-20.26*NIMTAAVG-7.13*EXERTAVG+1.41*SIGMA-0.045*RSIZE-2.13*CASHMTA+0.075*MB-0.058*PRICE-9.16,CHS,
+PFD,,,,,1/(1+math.e**(-LPFD)),CHS,
+CELast4,,,sum,4,fix_intan_other_asset_acqui_cash,,
+CELast16,,,sum,16,fix_intan_other_asset_acqui_cash,,
+CI,,,,,3*CELast4/(CELast16-CELast4)-1,,
