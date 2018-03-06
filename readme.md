@@ -4,14 +4,14 @@
 ### Get Start 开始使用
 
 * Fetch all data 下载所有数据
-<pre><code>
-from Stock import *
+
+<pre><code>from Stock import *
 Updater.everything()
 </pre></code>
 
 * Calculation stock indicators 计算标的指标
-<pre><code>
-stock=Stocks('000678')
+
+<pre><code>stock=Stocks('000678')
 df=stock.all_target()
 print(df)
 </pre></code>
@@ -58,4 +58,9 @@ print(df)
     <https://scholar.harvard.edu/campbell/publications/search-distress-risk>
 * __CI__    过度投资比例
 
----
+### ACKNOWLEDGEMENT
+
+本项目参考了《基本面量化》(张然,2017 <http://www.gsm.pku.edu.cn/info/1195/19527.htm>)
+
+武汉大学 廖珂 (Liao,K  Wuhan University)对本项目提供了细致的会计学专业支持
+
