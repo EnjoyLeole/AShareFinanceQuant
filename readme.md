@@ -1,6 +1,6 @@
-#A Share Financial Quant / A股基本面量化
+# A Share Financial Quant / A股基本面量化
 
-###主要功能
+### 主要功能
 
 
 * 免费数据获取（webio.py）
