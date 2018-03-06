@@ -2,8 +2,8 @@ A Share Financial Quant / A股基本面量化
 ===
 
 
-___
-##主要功能
+
+###主要功能
 
 
 * 免费数据获取（webio.py）
@@ -32,11 +32,15 @@ ___
 * __MG & MS__ 
     盈利能力与稳定性
 * __M-Score__ 
-    判断利润操纵的经典方法
+    >判断利润操纵的经典方法  
+    <https://en.wikipedia.org/wiki/Beneish_M-Score>
 * __Z-Score__ 
-    判断破产风险的经典方法
+    >判断破产风险的经典方法   
+    <https://en.wikipedia.org/wiki/Altman_Z-score>
 * __CHS Model__ 
-    基于时间序列判断破产风险
+    >基于时间序列的破产风险判断    
+    In Search of Distress Risk 
+    <https://scholar.harvard.edu/campbell/publications/search-distress-risk>
 * __CI__    过度投资比例
 
 ---

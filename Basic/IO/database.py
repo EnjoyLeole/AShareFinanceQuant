@@ -169,9 +169,7 @@ class DataHandler(object):
 
 
 class MySqlHandler(DataHandler):
-    @classmethod
-    def get_galaxis(cls, db = "cad"):
-        return cls(db, "galaxis", "galaxis", "103.21.140.19", 13606)
+
 
     def __init__(self, db, user = "root", password = "temppd", host = "localhost", port = 3306):
         super().__init__("mysql+pymysql", user, password, host, db, port, "?charset=utf8")

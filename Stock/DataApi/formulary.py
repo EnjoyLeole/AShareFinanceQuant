@@ -279,6 +279,7 @@ class Ticks(object):
             eqt = eqt.replace(field, '%s' % val)
 
         try:
+            #todo make it safer
             # print(idx, formula.target, eqt)
             result = eval(eqt)
             # print(idx, formula.target, eqt,result)
