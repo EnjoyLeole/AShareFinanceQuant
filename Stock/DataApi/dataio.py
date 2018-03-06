@@ -8,7 +8,7 @@ import pandas as pd
 import math
 from urllib3 import PoolManager
 
-STOCK_ROOT = "D:\Hui Lei\\StockData\\"
+STOCK_ROOT = "D:\\StockData\\"
 DATA_FOLDERS = {
     "indicator": "financial_indicator",
     "balance"  : "financial_balance",
