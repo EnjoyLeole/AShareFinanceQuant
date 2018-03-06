@@ -3,7 +3,7 @@ import tushare as ts
 from .Citics.trade import *
 from Basic.IO import *
 import ast
-import Stock.Meta
+import HQuant.Meta
 from .Meta import *
 import inspect
 

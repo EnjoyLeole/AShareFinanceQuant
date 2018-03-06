@@ -1,4 +1,4 @@
-from Stock.Meta import *
+from HQuant.Meta import *
 from Basic.Util import *
 from Basic.IO import obj2file, \
     file2obj

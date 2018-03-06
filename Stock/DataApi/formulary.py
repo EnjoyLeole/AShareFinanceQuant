@@ -143,6 +143,7 @@ class Ticks(object):
             if formula.target not in ['121DSRI']:
                 # continue
                 val = self.__finale_calc(formula)
+        return self.quota
 
     def target_series(self, target: str):
         for idx in range(-self.quota.shape[0], 0, 1):
