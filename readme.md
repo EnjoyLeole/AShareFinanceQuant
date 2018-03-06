@@ -1,7 +1,4 @@
-A Share Financial Quant / A股基本面量化
-===
-
-
+#A Share Financial Quant / A股基本面量化
 
 ###主要功能
 
@@ -25,9 +22,9 @@ A Share Financial Quant / A股基本面量化
     * 基于csv表格的公式定义
     * 支持对数据进行ttm、期内平均等前处理
     * 支持对指标进行几何平均、倾斜平均、方差等计算
-***
+
     
-### 部分财务指标
+### 部分已实现的财务指标
 
 * __MG & MS__ 
     盈利能力与稳定性
