@@ -1,9 +1,8 @@
-from .DataApi.formulary import *
+from .Funds.formulary import *
 import tushare as ts
 from .Citics.trade import *
-from Basic.IO import *
+from .Basic.IO import *
 import ast
-import HQuant.Meta
 from .Meta import *
 import inspect
 

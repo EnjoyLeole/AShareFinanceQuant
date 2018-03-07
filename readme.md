@@ -5,7 +5,7 @@
 
 * Fetch all data 下载所有数据
 
-<pre><code>from Stock import *
+<pre><code>from Funds import *
 Updater.everything()
 </pre></code>
 
