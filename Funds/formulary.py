@@ -11,6 +11,7 @@ INDEX_FLAG = 'Index_'
 RESERVED_KEYWORDS = ['math', 'log', 'log10', 'e']
 
 
+
 def discount(year):
     return 1 / math.pow(1 + CAPITAL_COST, year)
 
@@ -107,11 +108,11 @@ class _FinancialFormula(metaclass = SingletonMeta):
                 if len(tbs) > 0:
                     if 'history' in tbs:
                         if len(tbs) == 1:
-                            source = 'stock'
+                            source = TICK
                         else:
                             source = 'mixed'
                     else:
-                        source = 'financial'
+                        source = REPORT
                 table.ix[target, 'source'] = source
 
             return table, factor_dict
@@ -128,27 +129,40 @@ class _FinancialFormula(metaclass = SingletonMeta):
 Formula = _FinancialFormula()
 
 
+# class TimePoint:
+
+
 class Ticks(object):
-    def __init__(self, code, filter, table_getter, refer_index = None):
+    def __init__(self, code, filter, table_getter: callable, type: str, refer_index = None):
         self.code = code
+        self.type = type
         self.symbol = code2symbol(code)
         self.report, self.tick = table_getter()
         self.lastQuarter = self.report['quarter'].iloc[-1]
-        self.quota = pd.DataFrame(index = self.report.index)
+
+        self.target_category = self.type + '_target'
+        self.targets = DMgr.read_csv(self.target_category, code)
+        if self.targets is None:
+            self.targets = pd.DataFrame(index = self.report.index)
+
         self.formulas = Formula.table[Formula.table.target.apply(filter)]
         self.refer_index = refer_index
 
-    def all_target(self, interval = None):
+    def save_targets(self):
+        DMgr.save_csv(self.targets, self.target_category, self.code)
+        DMgr.save_csv(self.tick, self.type, self.code)
+
+    def all_target(self):
         for i, formula in self.formulas.iterrows():
-            if formula.target not in ['121DSRI']:
-                # continue
-                val = self.__finale_calc(formula)
-        return self.quota
+            if formula.source != TICK:
+                self.target_series(formula.target)
+        self.save_targets()
+        return self.targets
 
     def target_series(self, target: str):
-        for idx in range(-self.quota.shape[0], 0, 1):
+        for idx in range(-self.report.shape[0], 0, 1):
             self.target_calc(target, idx)
-        return self.quota[target]
+        return self.targets[target]
 
     def target_calc(self, target: str, idx: int = -1, prelude = np.nan):
         formula = self.formulas.loc[target]
@@ -162,10 +176,15 @@ class Ticks(object):
         :param prelude: procedure before evaluate equation
         :return: value result from formula
         '''
-        if abs(idx) <= self.quota.shape[0] and formula.target in self.quota:
-            fixes_val = self.quota.ix[idx, formula.target]
-            if fixes_val == fixes_val:
-                return fixes_val
+        target = formula.target
+        fixes_val = None
+        if formula.source == TICK and target in self.tick:
+            fixes_val = self.tick.ix[idx, target]
+        if abs(idx) <= self.targets.shape[0] and target in self.targets:
+            fixes_val = self.targets.ix[idx, target]
+        if fixes_val is not None and fixes_val == fixes_val:
+            return fixes_val
+
         prelude = formula.prelude if prelude != prelude else prelude
 
         if formula.finale != formula.finale:
@@ -187,8 +206,13 @@ class Ticks(object):
                 'decline_avg'      : lambda list: reduce(lambda accum, x: (accum + x) * fi, list,
                     0)}
 
-            n = int(formula.duration)
-            valS = [self.__prelude_val(formula, i, prelude) for i in range(idx - n + 1, idx + 1, 1)]
+            if formula.source==TICK:
+                valS=[]
+
+            else:
+                n = int(formula.duration)
+                start = idx - n + 1
+                valS = [self.__prelude_val(formula, i, prelude) for i in range(start, start + n, 1)]
             # pNum(formula.target, idx, valS, prelude,n,len(valS))
 
             if None in valS:
@@ -198,7 +222,10 @@ class Ticks(object):
 
         # print(idx, formula.target, val)
         if val is not None:
-            self.quota.ix[idx, formula.target] = val
+            if formula.source == TICK:
+                self.tick.ix[idx, formula.target] = val
+            else:
+                self.targets.ix[idx, formula.target] = val
         return val
 
     def __prelude_val(self, formula, idx, prelude = np.nan):
@@ -224,9 +251,6 @@ class Ticks(object):
                 return val
 
         def _hist(field):
-            # if field=='market_cap':
-            #     print(formula.target,self.code)
-
             val = tick.iloc[idx][field]
             return val
 
@@ -280,13 +304,16 @@ class Ticks(object):
             eqt = eqt.replace(field, '%s' % val)
 
         try:
-            #todo make it safer
+            # todo make it safer
             # print(idx, formula.target, eqt)
             result = eval(eqt)
             # print(idx, formula.target, eqt,result)
         except ZeroDivisionError:
             self.__warn_zero_division(formula, eqt)
             result = None
+        except Exception:
+            print(idx, formula.target, eqt)
+            raise Exception()
         return result
 
     def _idx_meaning(self, idx, ifReport):
@@ -295,13 +322,12 @@ class Ticks(object):
         else:
             print(self.tick.iloc[idx]['date'])
 
-    # def _print(self,idx:int,ifReport,*arg):
-
     def __warn_insufficient_data(self, formula, idx, num_req, num_actual):
         warnings.warn('%s @%s: only %s data point while %s required, evaluation aborted!' % (
             formula.target, idx, num_actual, num_req))
 
     def __warn_zero_division(self, formula, eqt):
+        return
         warnings.warn('Zero divided! %s->%s' % (formula.equation, eqt))
 
 
@@ -340,7 +366,7 @@ class Indexs(Ticks):
         self.elements_daily = code + '_daily'
         self.elements_quarter = code + '_quarterly'
 
-        super().__init__(code, lambda target: INDEX_FLAG in target, __get_table)
+        super().__init__(code, lambda target: INDEX_FLAG in target, __get_table, 'index')
 
     def _fetch_element_report(self, start_date):
         allFina = DMgr.category_concat(self.code_list, 'income', ['net_profit'], start_date,
@@ -415,12 +441,12 @@ class Stocks(Ticks):
             return report, tick
 
         refer = Indexs(*Idx_dict['HS300'])
-        super().__init__(code, lambda target: INDEX_FLAG not in target, __get_table, refer)
+        super().__init__(code, lambda target: INDEX_FLAG not in target, __get_table, 'stock', refer)
 
     def RIM(self, quarter = None):
         quarter = to_quarter(now()) if quarter is None else quarter
         quarter = min(self.lastQuarter, quarter)
-        fin = self.quota
+        fin = self.targets
         quart = self.report.loc[quarter]
         equity = quart.total_owner_equities
 

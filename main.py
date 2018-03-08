@@ -1,9 +1,10 @@
-from .Funds.formulary import *
+from Funds.formulary import *
+from Funds.statistic import *
 import tushare as ts
-from .Citics.trade import *
-from .Basic.IO import *
+from Citics.trade import *
+from Basic.IO import *
 import ast
-from .Meta import *
+from Meta import *
 import inspect
 
 simples = {
@@ -173,10 +174,14 @@ def quarter_date_merge_test():
     # dq=d1.loc[:,['date','quarter']]
 
 
-def target_test(target, name = 'maotai', idx = -1):
-    stk = Stocks(simples[name])
-    v = stk.target_calc(target, idx)
-    print(target, name, v)
+def target_test(target, code='000001', idx = 0):
+    stk = Stocks(code)
+    if idx==0:
+        vs=stk.target_series(target)
+        print(vs)
+    else:
+        v = stk.target_calc(target, idx)
+        print(target, code, v)
 
 
 def stock_test(field):
@@ -188,7 +193,7 @@ def stock_test(field):
         tt.target_series(field)
         # res=tt.quota
 
-        res = tt.quota.loc[:, [field]]
+        res = tt.targets.loc[:, [field]]
         res.rename(columns = {
             field: key}, inplace = True)
 
@@ -209,14 +214,22 @@ def error_reshow(name):
     # Updater._update_stock_hist(codes[0])
 
 
+def stockgroup_test():
+    all = StockGroups(DMgr.code_list)
+    all.all_targets()
+
+
 # DMgr.loop(Updater._update_stock_hist, codes,'test')
 
 
-def run():
+if __name__ == '__main__':
     # df=DMgr.read_csv('stock',code)
     # print(df.shape)
     # print(df.iloc[-1588])
 
     # target_test('MTA', 'letv')
-    stock_test('CI')
+    # stockgroup_test()
+    # stock_test('CI')
+    Formula.table.to_csv("d:/formula.csv",encoding = GBK)
+    # target_test('EXERTAVG')
     pass

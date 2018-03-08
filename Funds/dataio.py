@@ -1,25 +1,28 @@
-from HQuant.Meta import *
+from Meta import *
 from Basic.Util import *
-from Basic.IO import obj2file, \
-    file2obj
+from Basic.IO import obj2file, file2obj
 import time, os, re
 import numpy as np
 import pandas as pd
 import math
 from urllib3 import PoolManager
 
-STOCK_ROOT = "D:\\StockData\\"
+OLDEST_DATE = '1988-01-01'
+STOCK_ROOT = 'D:\\StockData\\'
 DATA_FOLDERS = {
-    "indicator": "financial_indicator",
-    "balance"  : "financial_balance",
-    "cash_flow": "financial_cash_flow",
-    "income"   : "financial_income",
-    "index"    : "market_index",
-    "macro"    : "macro",
-    "stock"    : "market_stock",
-    "temp"     : 'temp',
-    'category' : 'category'}
-
+    'indicator'   : 'financial_indicator',
+    'balance'     : 'financial_balance',
+    'cash_flow'   : 'financial_cash_flow',
+    'income'      : 'financial_income',
+    'index'       : 'market_index',
+    'macro'       : 'macro',
+    'stock'       : 'market_stock',
+    'temp'        : 'temp',
+    'stock_target': 'stock_target',
+    'index_target': 'index_target',
+    'category'    : 'category'}
+TICK='ticks_daily'
+REPORT='financial_report_quarterly'
 
 def get_url(url, encoding = ''):
     if encoding == '':
@@ -87,7 +90,7 @@ def brief_detail_merge(brief, detail, ifReduce2brief = False, brief_col = 'quart
 
 
 class _DataManager(metaclass = SingletonMeta):
-    cl_path = STOCK_ROOT + "code_list.csv"
+    cl_path = STOCK_ROOT + 'code_list.csv'
 
     def __init__(self):
         self.code_table = pd.read_csv(self.cl_path, encoding = GBK)
@@ -116,7 +119,7 @@ class _DataManager(metaclass = SingletonMeta):
         DMgr.code_table.to_csv(DMgr.cl_path, encoding = GBK, index = False)
 
     def __csv_path(self, category, code):
-        return STOCK_ROOT + "%s\\%s.csv" % (DATA_FOLDERS[category], code)
+        return STOCK_ROOT + '%s\\%s.csv' % (DATA_FOLDERS[category], code)
 
     def read_csv(self, category, code, ifRegular = True):
         path = self.__csv_path(category, code)
@@ -145,7 +148,7 @@ class _DataManager(metaclass = SingletonMeta):
         # DWash.reform_tick(exist)
         if exist is None:
             exist = pd.DataFrame()
-            start = '1988-01-01'
+            start = OLDEST_DATE
         else:
             idx = exist[index]
             if idx[0] > idx[1]:
@@ -228,8 +231,8 @@ class _DataWasher(metaclass = SingletonMeta):
         self.mapper = get_lib('mapper')
         self.mapper['alias'] = self.mapper['alias'].apply(self._simplify_name)
         if self.COLUMN_UPDATE:
-            self.mapper["matchCount"] = 0
-            self.mapper["matches"] = ""
+            self.mapper['matchCount'] = 0
+            self.mapper['matches'] = ''
 
         self.match_path = get_lib_path('matched')
         if not os.path.exists(self.match_path):
@@ -245,7 +248,7 @@ class _DataWasher(metaclass = SingletonMeta):
 
     DuplicatedFlag = '*2'
 
-    def _column_match(self, df: pd.DataFrame, category = ""):
+    def _column_match(self, df: pd.DataFrame, category = ''):
         matches = {}
         if category != '' and category in self.matched:
             matches = self.matched[category]
@@ -255,7 +258,7 @@ class _DataWasher(metaclass = SingletonMeta):
                 candidates = []
 
                 for key, row in self.mapper.iterrows():
-                    alias = row["alias"]
+                    alias = row['alias']
                     if isinstance(alias, str) and alias in col:
                         candidates.append([key, row])
 
@@ -264,13 +267,13 @@ class _DataWasher(metaclass = SingletonMeta):
                     if n == 1:
                         key, chosen = candidates[0]
                     else:
-                        key, chosen = max_at(candidates, lambda cand: len(cand[1]["alias"]))
-                    new_name = chosen["field"]
+                        key, chosen = max_at(candidates, lambda cand: len(cand[1]['alias']))
+                    new_name = chosen['field']
 
                     matches[col_name] = new_name
                     if self.COLUMN_UPDATE:
-                        self.mapper.ix[key, "matchCount"] += 1
-                        self.mapper.ix[key, "matches"] += "%s %s " % (col, category)
+                        self.mapper.ix[key, 'matchCount'] += 1
+                        self.mapper.ix[key, 'matches'] += '%s %s ' % (col, category)
                         self.mapper.to_csv('D:/field_mapper.csv', encoding = GBK)
                 else:
                     judge = col == self.mapper['field']
@@ -353,7 +356,7 @@ class _DataWasher(metaclass = SingletonMeta):
                     if field != id:
                         __compareI(id, field)
 
-    def column_regularI(self, df: pd.DataFrame, category = ""):
+    def column_regularI(self, df: pd.DataFrame, category = ''):
         matches = self._column_match(df, category)
 
         df.rename(columns = matches, inplace = True)
@@ -365,7 +368,7 @@ class _DataWasher(metaclass = SingletonMeta):
     # region one time active for files
 
     def simplify_dirs(cls, category):
-        folder = STOCK_ROOT + DATA_FOLDERS[category] + "\\"
+        folder = STOCK_ROOT + DATA_FOLDERS[category] + '\\'
         prefix = re.compile('([0-9]*.csv)')
         for file in os.listdir(folder):
             new_file = prefix.search(file)[0]
@@ -375,12 +378,12 @@ class _DataWasher(metaclass = SingletonMeta):
     def simplify_mapper(cls):
         pattern = re.compile(r'(.*)(\s*\(|（)')
         for row in cls.mapper.iterrows():
-            alias = row[1]["alias"]
+            alias = row[1]['alias']
             # print(alias)
             if isinstance(alias, str) and ('(' in alias or '（' in alias):
                 match = pattern.match(alias)
                 new_alias = match.group(1)
-                cls.mapper.ix[row[0], "alias"] = new_alias
+                cls.mapper.ix[row[0], 'alias'] = new_alias
                 print(new_alias)
 
     # endregion
