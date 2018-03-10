@@ -58,6 +58,7 @@ class N163(object):
     def override_finance(cls, code):
         for cate in cls.url_finance:
             url = cls.url_finance[cate] % code
+            # print(url)
             df = pd.read_csv(url, encoding = GBK)
             df.set_index(df.columns[0], inplace = True)
             DWash.replaceI(df, '--', 0)

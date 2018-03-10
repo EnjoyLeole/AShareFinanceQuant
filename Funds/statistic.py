@@ -7,8 +7,9 @@ class StockGroups:
         self.code_list = code_list
 
     def all_targets(self):
-        for code in self.code_list:
+        def  calc(code):
             print(code + ' start')
             stk=Stocks(code)
             stk.all_target()
             print(code+' saved')
+        DMgr.iter_stocks(calc,'target_calc')

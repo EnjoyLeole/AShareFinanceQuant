@@ -11,7 +11,6 @@ INDEX_FLAG = 'Index_'
 RESERVED_KEYWORDS = ['math', 'log', 'log10', 'e']
 
 
-
 def discount(year):
     return 1 / math.pow(1 + CAPITAL_COST, year)
 
@@ -138,22 +137,40 @@ class Ticks(object):
         self.type = type
         self.symbol = code2symbol(code)
         self.report, self.tick = table_getter()
+        if self.report is None or self.report.shape[0]==0 or self.tick is None:
+            self.formulas =None
+            warnings.warn('%s %s dont have data!' % (type, code))
+            return
+        self.tick.date = self.tick.date.apply(std_date_str)
+        self.tick.index = self.tick.date
+        self.tick['quarter'] = self.tick.date.apply(to_quarter)
+        # if self.report.shape[0]>0:
         self.lastQuarter = self.report['quarter'].iloc[-1]
 
         self.target_category = self.type + '_target'
         self.targets = DMgr.read_csv(self.target_category, code)
+
         if self.targets is None:
             self.targets = pd.DataFrame(index = self.report.index)
+            self.targets['quarter'] = self.targets.index
+
+        else:
+            self.targets.index = self.targets.quarter
 
         self.formulas = Formula.table[Formula.table.target.apply(filter)]
         self.refer_index = refer_index
+
+        self.idx_map = {}
 
     def save_targets(self):
         DMgr.save_csv(self.targets, self.target_category, self.code)
         DMgr.save_csv(self.tick, self.type, self.code)
 
     def all_target(self):
+        if self.formulas is None:
+            return None
         for i, formula in self.formulas.iterrows():
+            # print(i)
             if formula.source != TICK:
                 self.target_series(formula.target)
         self.save_targets()
@@ -162,13 +179,10 @@ class Ticks(object):
     def target_series(self, target: str):
         for idx in range(-self.report.shape[0], 0, 1):
             self.target_calc(target, idx)
-        return self.targets[target]
+        if target in self.targets:
+            return self.targets[target]
 
-    def target_calc(self, target: str, idx: int = -1, prelude = np.nan):
-        formula = self.formulas.loc[target]
-        return self.__finale_calc(formula, idx, prelude)
-
-    def __finale_calc(self, formula: pd.Series, idx: int = -1, prelude = np.nan):
+    def target_calc(self, target: str, idx = -1, prelude = np.nan):
         '''
         using data from self(Ticks) to fill formula's equation, consider prelude & finale procedure to get final value
         :param formula: formula to be calculated
@@ -176,59 +190,94 @@ class Ticks(object):
         :param prelude: procedure before evaluate equation
         :return: value result from formula
         '''
+        if target not in self.formulas.index.values:
+            # print(self.code,target,self.formulas.index.values)
+            val = self.refer_index.target_calc(target, idx, prelude)
+            return val
+        formula = self.formulas.loc[target]
+
+        if formula.source == TICK:
+            return self._tick_formula_val(formula, idx, prelude)
+        else:
+            return self._report_formula_calc(formula, idx, prelude)
+
+    def _report_formula_calc(self, formula, idx = -1, prelude = np.nan):
         target = formula.target
-        fixes_val = None
-        if formula.source == TICK and target in self.tick:
-            fixes_val = self.tick.ix[idx, target]
         if abs(idx) <= self.targets.shape[0] and target in self.targets:
-            fixes_val = self.targets.ix[idx, target]
-        if fixes_val is not None and fixes_val == fixes_val:
+            fixes_val = self.targets.iloc[idx][target]
+            # if fixes_val == fixes_val:
             return fixes_val
 
         prelude = formula.prelude if prelude != prelude else prelude
 
         if formula.finale != formula.finale:
-            val = self.__prelude_val(formula, idx, prelude)
+            val = self.__equation_val(formula, idx, prelude)
         else:
             if formula.source == 'mixed':
                 raise Exception('Source of finale_calc %s not specified!' % formula.target)
-            fi = 2 ** (-1 / 3)
-            iter = {
-                'sum'              : lambda list: sum(list),
-                'mean'             : lambda list: sum(list) / len(list),
-                'sd'               : lambda list: statistics.stdev(list),
-                'vix_yearly'       : lambda list: (sum([
-                    x ** 2 for x in list]) * 252 / len(list)) ** 0.5,
-                'percent_geometric': lambda list: -1 + reduce(lambda accum, x: accum * (1 + x),
-                    list, 1) ** (1 / len(list)),
-                'change'           : lambda list: list[-1] / list[0] - 1 if list[0] != 0 else 0,
-                'inc'              : lambda list: list[-1] - list[0],
-                'decline_avg'      : lambda list: reduce(lambda accum, x: (accum + x) * fi, list,
-                    0)}
+            n = int(formula.duration)
+            start = idx - n + 1
+            chosen = range(start, start + n, 1)
+            val = self.__series_reduce(chosen, formula, prelude)
 
-            if formula.source==TICK:
-                valS=[]
-
-            else:
-                n = int(formula.duration)
-                start = idx - n + 1
-                valS = [self.__prelude_val(formula, i, prelude) for i in range(start, start + n, 1)]
-            # pNum(formula.target, idx, valS, prelude,n,len(valS))
-
-            if None in valS:
-                val = None
-            else:
-                val = iter[formula.finale](valS)
-
-        # print(idx, formula.target, val)
-        if val is not None:
-            if formula.source == TICK:
-                self.tick.ix[idx, formula.target] = val
-            else:
-                self.targets.ix[idx, formula.target] = val
+        # print('report val:', idx, formula.target, formula.source, val)
+        if abs(idx) <= self.targets.shape[0]:
+            self.targets.ix[idx, formula.target] = val
+        # else:
+        #     print(idx)
+        #     self.targets.iloc[idx] = pd.Series()
+        #     self.targets.ix[idx, formula.target] = val
         return val
 
-    def __prelude_val(self, formula, idx, prelude = np.nan):
+    def _tick_formula_val(self, formula, idx, prelude):
+        tick = self.tick
+        if formula.target in tick and idx in tick.index:
+            val = tick.ix[idx, formula.target]
+            if val == val:
+                return val
+        # print(self,idx)
+        idx_date, idx_quart = self.__idx2date(idx)
+        if idx_date is None:
+            val = None
+        elif formula.finale != formula.finale:
+            val = self.__equation_val(formula, idx_date, prelude)
+        else:
+            n = int(formula.duration)
+            start_quarter = quarter_add(idx_quart, -n)
+            _, start_date = quarter_dates(start_quarter)
+            chosen = tick[(tick.index > start_date) & (tick.index <= idx_date)].index.values
+            # print(start_date,idx_date,len(chosen),chosen)
+            val = self.__series_reduce(chosen, formula, prelude)
+        # print('tick_target',idx,idx_date,formula.target,val)
+        # if val is not None:
+        self.tick.ix[idx_date, formula.target] = val
+        return val
+
+    def __series_reduce(self, idx_list, formula, prelude):
+        fi = 2 ** (-1 / 3)
+        iter = {
+            'sum'              : lambda list: sum(list),
+            'mean'             : lambda list: sum(list) / len(list),
+            'sd'               : lambda list: statistics.stdev(list),
+            'vix_yearly'       : lambda list: (sum([
+                x ** 2 for x in list]) * 252 / len(list)) ** 0.5,
+            'percent_geometric': lambda list: -1 + reduce(lambda accum, x: accum * (1 + x),
+                list, 1) ** (1 / len(list)),
+            'change'           : lambda list: list[-1] / list[0] - 1 if list[0] != 0 else 0,
+            'inc'              : lambda list: list[-1] - list[0],
+            'decline_avg'      : lambda list: reduce(lambda accum, x: (accum + x) * fi, list,
+                0)}
+
+        valS = [self.__equation_val(formula, idx, prelude) for idx in idx_list]
+        # pNum(formula.target, idx_list, valS, prelude,len(valS))
+        if None in valS or len(valS) == 0:
+            val = None
+        else:
+            val = iter[formula.finale](valS)
+            # print(len(valS),formula.target,val,valS)
+        return val
+
+    def __equation_val(self, formula, idx, prelude = np.nan):
         eqt = formula.equation
         fields = Formula.target_factors[formula.target]
         prelude = formula.prelude if prelude != prelude else prelude
@@ -237,22 +286,26 @@ class Ticks(object):
         tick = self.tick
         report = self.report
 
-        def _target(target):
+        def _hist(field):
+            if idx in tick.index:
+                val = tick.ix[idx, field]
+            else:
+                idx_date, _ = self.__idx2date(idx)
+                if idx_date is None:
+                    val=None
+                else:
+                    val = tick.ix[idx_date, field]
+                # raise Exception('%s not in %s for %s %s' % (idx, self.code, formula.target, field))
+            return val
+
+        def _target(field):
             if havePrelude:
-                if Formula.table.loc[target].flag != 'addOnly':
+                if Formula.table.loc[field].flag != 'addOnly':
                     raise Exception(
                         'Formula %s %s contains calculating factor while requiring prelude '
                         'could cause un-predicted '
                         'problem!' % (formula.target, fields))
-            if target in self.formulas.index.values:
-                return self.target_calc(target, idx, prelude)
-            else:
-                val = self.refer_index.target_calc(target, idx, prelude)
-                return val
-
-        def _hist(field):
-            val = tick.iloc[idx][field]
-            return val
+            return self.target_calc(field, idx, prelude)
 
         def _fina(field):
             if not havePrelude:
@@ -298,8 +351,8 @@ class Ticks(object):
         for field in fields:
             tb = Formula.table_of(field)
             val = tb_funcs[tb](field)
-            # print(idx, tb, field, val)
-            if val is None:
+            # print('Field fetch',idx, tb, field, val)
+            if val is None or val != val:
                 return None
             eqt = eqt.replace(field, '%s' % val)
 
@@ -311,16 +364,32 @@ class Ticks(object):
         except ZeroDivisionError:
             self.__warn_zero_division(formula, eqt)
             result = None
-        except Exception:
-            print(idx, formula.target, eqt)
-            raise Exception()
+        except Exception as e:
+            print(idx, formula.target, eqt, e)
+            raise Exception('Unpredict')
         return result
 
-    def _idx_meaning(self, idx, ifReport):
-        if ifReport:
-            print(self.report.iloc[idx]['quarter'])
+    def __idx2date(self, idx):
+        if idx in self.idx_map:
+            return self.idx_map[idx]
+
+        if isinstance(idx, str) and DATE_SEPARATOR in idx:
+            idx_date = idx
+            idx_quart = to_quarter(idx_date)
         else:
-            print(self.tick.iloc[idx]['date'])
+            if (isinstance(idx, str) and idx.isdigit()) or isinstance(idx, int):
+                idx_quart = quarter_add(to_quarter(today()), idx + 1)
+            elif QUARTER_SEPARATOR in idx:
+                idx_quart = idx
+            elif DATE_SEPARATOR not in idx:
+                raise Exception('Un expected idx %s for tick' % (idx))
+            tick = self.tick
+            idx_cands = tick[tick.quarter <= idx_quart]
+            if idx_cands.shape[0] == 0:
+                return None, None
+            idx_date = std_date_str(idx_cands.iloc[-1]['date'])
+        self.idx_map[idx] = [idx_date, idx_quart]
+        return idx_date, idx_quart
 
     def __warn_insufficient_data(self, formula, idx, num_req, num_actual):
         warnings.warn('%s @%s: only %s data point while %s required, evaluation aborted!' % (
@@ -410,6 +479,8 @@ Idx_dict = {
     'SZ50' : ['sz50', '000016'],
     'ZZ500': ['zz500', '000905']}
 
+HS300 = Indexs(*Idx_dict['HS300'])
+
 
 # todo Dupt  detail into ATO
 # todo compare MG & MS cross the market
@@ -421,27 +492,28 @@ class Stocks(Ticks):
             report = None
             for tb in ['balance', 'cash_flow', 'income']:
                 df = DMgr.read_csv(tb, self.code, ifRegular = False)
-                df['quarter'] = df['date'].apply(to_quarter)
-                df = df[df.quarter != None]
-                if report is None:
-                    report = df
-                else:
-                    report = pd.merge(report, df, on = 'quarter',
-                        suffixes = ('', DWash.DuplicatedFlag))
-
-            DWash.column_regularI(report, 'financial_set')
-            report.index = report.quarter
-            report.sort_index(inplace = True)
+                if df is not None:
+                    df['quarter'] = df['date'].apply(to_quarter)
+                    df = df[df.quarter != None]
+                    if report is None:
+                        report = df
+                    else:
+                        report = pd.merge(report, df, on = 'quarter',
+                            suffixes = ('', DWash.DuplicatedFlag))
+            if report.shape[0] > 0:
+                DWash.column_regularI(report, 'financial_set')
+                report.index = report.quarter
+                report.sort_index(inplace = True)
 
             tick = DMgr.read_csv('stock', code)
-            tick = tick[tick.close != 0]
-            DWash.get_changeI(tick)
-            tick.sort_values('date', inplace = True)
+            if tick is not None:
+                tick = tick[tick.close != 0]
+                DWash.get_changeI(tick)
+                tick.sort_values('date', inplace = True)
 
             return report, tick
 
-        refer = Indexs(*Idx_dict['HS300'])
-        super().__init__(code, lambda target: INDEX_FLAG not in target, __get_table, 'stock', refer)
+        super().__init__(code, lambda target: INDEX_FLAG not in target, __get_table, 'stock', HS300)
 
     def RIM(self, quarter = None):
         quarter = to_quarter(now()) if quarter is None else quarter

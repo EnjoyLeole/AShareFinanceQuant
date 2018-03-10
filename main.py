@@ -165,6 +165,7 @@ def reg_resolve_test(formula):
 
 # endregion
 
+# region formula
 def quarter_date_merge_test():
     quart = DMgr.read_csv('balance', code)
     dat = DMgr.read_csv('stock', code)
@@ -172,16 +173,6 @@ def quarter_date_merge_test():
     d2 = brief_detail_merge(quart, dat, ifReduce2brief = False)
     # qddate=quart[['date','quarter']]
     # dq=d1.loc[:,['date','quarter']]
-
-
-def target_test(target, code='000001', idx = 0):
-    stk = Stocks(code)
-    if idx==0:
-        vs=stk.target_series(target)
-        print(vs)
-    else:
-        v = stk.target_calc(target, idx)
-        print(target, code, v)
 
 
 def stock_test(field):
@@ -205,6 +196,12 @@ def stock_test(field):
     print(df)
 
 
+def code_re():
+    DMgr.code_table['code'] = DMgr.code_table['code'].apply(lambda x: x.zfill(6))
+    df = DMgr.code_table
+    df.to_csv('D:/code.csv', encoding = GBK)
+
+
 def error_reshow(name):
     list = file2obj(get_error_path(name))
     for code in list:
@@ -214,22 +211,42 @@ def error_reshow(name):
     # Updater._update_stock_hist(codes[0])
 
 
+# endregion
+
+def stock_target_test(code = '000001', target = None, idx = 0):
+    stk = Stocks(code)
+    if target is None:
+        stk.all_target()
+    else:
+        if idx == 0:
+            vs = stk.target_series(target)
+            print(vs)
+        else:
+            v = stk.target_calc(target, idx)
+            print(target, code, v)
+        stk.save_targets()
+
+
+def index_target_test(code = '399300'):
+    id = Indexs('hs300', code)
+    id.all_target()
+
+
 def stockgroup_test():
     all = StockGroups(DMgr.code_list)
     all.all_targets()
 
 
-# DMgr.loop(Updater._update_stock_hist, codes,'test')
-
-
 if __name__ == '__main__':
-    # df=DMgr.read_csv('stock',code)
-    # print(df.shape)
-    # print(df.iloc[-1588])
-
-    # target_test('MTA', 'letv')
     # stockgroup_test()
-    # stock_test('CI')
-    Formula.table.to_csv("d:/formula.csv",encoding = GBK)
-    # target_test('EXERTAVG')
+    stock_target_test(code = '601828')
+    list = get_error_list('twice')
+    codes = [x[1] for x in list]
+    DMgr.loop(stock_target_test, codes, 'twice')
+    # for code in list:
+    #     print(code)
+    #     stock_target_test(code = code[1])
+
+    # index_target_test()
+
     pass

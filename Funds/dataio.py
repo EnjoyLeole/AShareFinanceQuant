@@ -1,6 +1,6 @@
 from Meta import *
 from Basic.Util import *
-from Basic.IO import obj2file, file2obj
+from Basic.IO import *
 import time, os, re
 import numpy as np
 import pandas as pd
@@ -18,11 +18,12 @@ DATA_FOLDERS = {
     'macro'       : 'macro',
     'stock'       : 'market_stock',
     'temp'        : 'temp',
-    'stock_target': 'stock_target',
-    'index_target': 'index_target',
+    'stock_target': 'target_stock',
+    'index_target': 'target_index',
     'category'    : 'category'}
-TICK='ticks_daily'
-REPORT='financial_report_quarterly'
+TICK = 'ticks_daily'
+REPORT = 'financial_report_quarterly'
+
 
 def get_url(url, encoding = ''):
     if encoding == '':
@@ -118,8 +119,15 @@ class _DataManager(metaclass = SingletonMeta):
         DMgr.code_table['stop'] = DMgr.code_table.code.apply(__if_stop)
         DMgr.code_table.to_csv(DMgr.cl_path, encoding = GBK, index = False)
 
+    def _create_all_folders(self):
+        for key in DATA_FOLDERS:
+            folder = STOCK_ROOT + DATA_FOLDERS[key]
+            if not os.path.exists(folder):
+                os.makedirs(folder)
+
     def __csv_path(self, category, code):
-        return STOCK_ROOT + '%s\\%s.csv' % (DATA_FOLDERS[category], code)
+        folder = STOCK_ROOT + DATA_FOLDERS[category] + '\\'
+        return folder + '%s.csv' % code
 
     def read_csv(self, category, code, ifRegular = True):
         path = self.__csv_path(category, code)
@@ -188,6 +196,9 @@ class _DataManager(metaclass = SingletonMeta):
                         fails.append([flag, code])
                     if delay > 0:
                         time.sleep(delay)
+                except Exception as e:
+                    print(e)
+                    fails.append([flag, code])
             count += 1
 
         if len(fails) > 0:
