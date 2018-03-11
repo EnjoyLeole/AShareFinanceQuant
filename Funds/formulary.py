@@ -132,13 +132,14 @@ Formula = _FinancialFormula()
 
 
 class Ticks(object):
+
     def __init__(self, code, filter, table_getter: callable, type: str, refer_index = None):
         self.code = code
         self.type = type
         self.symbol = code2symbol(code)
         self.report, self.tick = table_getter()
-        if self.report is None or self.report.shape[0]==0 or self.tick is None:
-            self.formulas =None
+        if self.report is None or self.report.shape[0] == 0 or self.tick is None:
+            self.formulas = None
             warnings.warn('%s %s dont have data!' % (type, code))
             return
         self.tick.date = self.tick.date.apply(std_date_str)
@@ -204,9 +205,9 @@ class Ticks(object):
     def _report_formula_calc(self, formula, idx = -1, prelude = np.nan):
         target = formula.target
         if abs(idx) <= self.targets.shape[0] and target in self.targets:
-            fixes_val = self.targets.iloc[idx][target]
-            # if fixes_val == fixes_val:
-            return fixes_val
+            fixes_val = self.targets.ix[idx,target]
+            if fixes_val == fixes_val:
+                return fixes_val
 
         prelude = formula.prelude if prelude != prelude else prelude
 
@@ -231,14 +232,15 @@ class Ticks(object):
 
     def _tick_formula_val(self, formula, idx, prelude):
         tick = self.tick
-        if formula.target in tick and idx in tick.index:
-            val = tick.ix[idx, formula.target]
+        idx_date, idx_quart = self.__idx2date(idx)
+        if idx_date is None:
+            return None
+        if formula.target in tick and idx_date in tick.index:
+            val = tick.ix[idx_date, formula.target]
             if val == val:
                 return val
         # print(self,idx)
-        idx_date, idx_quart = self.__idx2date(idx)
-        if idx_date is None:
-            val = None
+
         elif formula.finale != formula.finale:
             val = self.__equation_val(formula, idx_date, prelude)
         else:
@@ -288,19 +290,20 @@ class Ticks(object):
 
         def _hist(field):
             if idx in tick.index:
+                # print(idx,field)
                 val = tick.ix[idx, field]
             else:
                 idx_date, _ = self.__idx2date(idx)
                 if idx_date is None:
-                    val=None
+                    val = None
                 else:
-                    val = tick.ix[idx_date, field]
+                    val = tick.at[idx_date, field]
                 # raise Exception('%s not in %s for %s %s' % (idx, self.code, formula.target, field))
             return val
 
         def _target(field):
             if havePrelude:
-                if Formula.table.loc[field].flag != 'addOnly':
+                if Formula.table.at[field,'flag'] != 'addOnly':
                     raise Exception(
                         'Formula %s %s contains calculating factor while requiring prelude '
                         'could cause un-predicted '

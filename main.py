@@ -214,6 +214,7 @@ def error_reshow(name):
 # endregion
 
 def stock_target_test(code = '000001', target = None, idx = 0):
+    t0=datetime.now()
     stk = Stocks(code)
     if target is None:
         stk.all_target()
@@ -225,6 +226,7 @@ def stock_target_test(code = '000001', target = None, idx = 0):
             v = stk.target_calc(target, idx)
             print(target, code, v)
         stk.save_targets()
+    print(datetime.now()-t0)
 
 
 def index_target_test(code = '399300'):
@@ -239,14 +241,14 @@ def stockgroup_test():
 
 if __name__ == '__main__':
     # stockgroup_test()
-    stock_target_test(code = '601828')
-    list = get_error_list('twice')
-    codes = [x[1] for x in list]
-    DMgr.loop(stock_target_test, codes, 'twice')
-    # for code in list:
-    #     print(code)
-    #     stock_target_test(code = code[1])
-
-    # index_target_test()
-
+    # stock_target_test(code = '300104')
+    # list = get_error_list('twice')
+    # codes = [x[1] for x in list]
+    # DMgr.loop(stock_target_test, codes, 'twice')
+    # # for code in list:
+    # #     print(code)
+    # #     stock_target_test(code = code[1])
+    #
+    # # index_target_test()
+    stock_target_test()
     pass

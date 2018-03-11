@@ -1,4 +1,9 @@
 # import datetime
+
+import cython
+
+cimport numpy as np
+cimport cython
 from datetime import datetime, timedelta, date
 
 DATE_SEPARATOR = '-'
@@ -10,6 +15,8 @@ INTERVAL_ORDER = {
     'month'  : 2,
     'date'   : 3}
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def today():
     return datetime.now().date()
 
