@@ -23,6 +23,9 @@ DATA_FOLDERS = {
     'category'    : 'category'}
 TICK = 'ticks_daily'
 REPORT = 'financial_report_quarterly'
+DUPLICATE_FLAG = '_d'
+FORCE_FILLED = 'force_filled'
+TTM_SUFFIX = '_ttm'
 
 
 def get_url(url, encoding = ''):
@@ -41,6 +44,42 @@ def code2symbol(code):
     return code + '.' + tail
 
 
+def remove_duplicateI(df):
+    dups = [x for x in df if x.endswith(DUPLICATE_FLAG)]
+    df.drop(dups, axis = 1, inplace = True)
+
+
+def fill_missI(df, refer_idxs, brief_col = 'quarter', ifLabelingFilled = True):
+    # brief_col = 'index' if brief_col is None else brief_col
+    missing = [x for x in refer_idxs if x not in df[brief_col].values]
+    missing = list(set(missing))
+    if ifLabelingFilled:
+        df[FORCE_FILLED] = False
+    for qt in missing:
+        cands = df[df[brief_col] > qt][brief_col]
+        if cands.shape[0] > 0:
+            chosen = cands[0]
+        else:
+            chosen = df[brief_col][-1]
+        df.loc[qt] = df.loc[chosen]
+        df.loc[qt, brief_col] = qt
+        if ifLabelingFilled:
+            df.loc[qt, FORCE_FILLED] = True
+    return df
+
+
+def reduce2brief(df, brief_col = 'quarter', detail_col = 'date'):
+    if brief_col not in df:
+        detail2brief_func = INTERVAL_TRANSFER[(detail_col, brief_col)]
+        df[brief_col] = df[detail_col].apply(detail2brief_func)
+    group = df.groupby(brief_col).agg({
+        detail_col: 'max'})
+    flag = df[detail_col].apply(lambda x: True if x in group.values else False)
+    df_reduced = df[flag].copy()
+    df_reduced.index = df_reduced[brief_col]
+    return df_reduced
+
+
 def brief_detail_merge(brief, detail, ifReduce2brief = False, brief_col = 'quarter',
                        detail_col = 'date'):
     '''将周期不同的两张表做合并，在两表的index不完全重合时，会使用相邻项进行填充
@@ -56,36 +95,24 @@ def brief_detail_merge(brief, detail, ifReduce2brief = False, brief_col = 'quart
     brief.index = brief[brief_col]
     brief = brief[brief[brief_col] > '']
 
-    def fill_missed(master_df, slave_df):
-        missing = [x for x in master_df[brief_col] if x not in slave_df[brief_col].values]
-        for qt in missing:
-            cands = slave_df[slave_df[brief_col] > qt][brief_col]
-            if cands.shape[0] > 0:
-                chosen = cands[0]
-            else:
-                chosen = slave_df[brief_col][-1]
-            slave_df.loc[qt] = slave_df.loc[chosen]
-            slave_df.loc[qt, brief_col] = qt
-        return slave_df
-
     if ifReduce2brief:
-        group = detail.groupby(brief_col).agg({
-            detail_col: 'max'})
-        flag = detail[detail_col].apply(lambda x: True if x in group.values else False)
-        df_reduced = detail[flag].copy()
-        df_reduced.index = df_reduced[brief_col]
+        df_reduced = reduce2brief(detail, brief_col, detail_col)
         if df_reduced.shape[0] < brief.shape[0]:
-            df_reduced = fill_missed(brief, df_reduced)
+            df_reduced = fill_missI(df_reduced, brief.index, brief_col)
         detail = df_reduced
         method = 'left'
         valid = '1:m'
     else:
-        brief = fill_missed(detail, brief)
+        brief = fill_missI(brief, detail[brief_col], brief_col)
         method = 'right'
         valid = '1:m'
     df = pd.merge(brief, detail, on = brief_col, how = method, validate = valid,
-        suffixes = ['', '_d'])
+        suffixes = ['', DUPLICATE_FLAG])
     df.sort_values([brief_col, detail_col], inplace = True)
+    # cols=sorted(df.columns.values)
+    # pco=sorted(set(cols))
+    # print(cols)
+    # print(pco)
     # print(brief.shape, detail.shape, df.shape)
     return df
 
@@ -350,27 +377,26 @@ class _DataWasher(metaclass = SingletonMeta):
                         dual_key: dual_key + 'Done'})
 
         keys = {}
-        for col in matches:
-            if col.endswith('Done'):
-                continue
-            field = matches[col]
-            id = field.split('~')[0]
+        cols_id = [[x.split('~')[0], x] for x in df.columns]
+        for id, col in cols_id:
             if id not in keys:
-                keys[id] = [1, [field]]
+                keys[id] = [0, [col]]
             else:
-                keys[id][0] += 1
-                keys[id][1].append(field)
+                keys[id] = [keys[id][0] + 1, keys[id].append(col)]
 
         for id in keys:
-            if keys[id][0] > 1 and id != 'date':
+            if keys[id][0] > 1:
                 for field in keys[id][1]:
-                    if field != id:
+                    if id == 'date' and field != 'date':
+                        df.drop(field, inplace = True)
+                    elif id != field:
                         __compareI(id, field)
 
     def column_regularI(self, df: pd.DataFrame, category = ''):
         matches = self._column_match(df, category)
 
         df.rename(columns = matches, inplace = True)
+
         # print([col for col in df.columns.values if 'long_d' in col])
         self._column_select(df, matches)
 
@@ -443,28 +469,43 @@ class _DataWasher(metaclass = SingletonMeta):
 
     # endregion
 
-    def ttm_column(self, df, column, suffix = '_ttm'):
-        newCol = column + suffix
+    def ttm_column(self, df, column, new_column = None, n = 4):
+        newCol = column + TTM_SUFFIX if new_column is None else new_column
         df[newCol] = 0
         if 'quarter' not in df:
             print('no quarter given, aborted!')
             return
 
         df = df.sort_values('quarter')
-        last = [0, 0, 0, 0, 0]
-        li = []
-        for key, row in df.iterrows():
-            cur = row[column]
-            qs = row['quarter']
+        if n == 2:
+            # def t2(row):
+            #     if first in row.quarter:
+            #         return row[column]
+            #     else:
+            #         return row[column]
 
-            year, qt = qs.split(QUARTER_SEPARATOR)
-            qt = int(qt)
-            ttm = cur + last[4] - last[qt]
-            last[qt] = row[column]
-            li.append(ttm)
-        df[newCol] = li
+            shift = df[column].shift(1)
+            df['quart'] = df['quarter'].apply(lambda x: x.split(QUARTER_SEPARATOR)[1])
+            df[newCol] = df[column] - shift
+            df[newCol] = df.apply(lambda row: row[column] if row['quart'] == '1' else row[newCol],
+                axis = 1)
+            # print(df[newCol])
+            # df[newCol] = df[['quarter', column]].apply(t2, axis = 1)
+
+        else:
+            last = [0, 0, 0, 0, 0]
+            li = []
+            for key, row in df.iterrows():
+                cur = row[column]
+                qs = row['quarter']
+
+                year, qt = qs.split(QUARTER_SEPARATOR)
+                qt = int(qt)
+                ttm = cur + last[4] - last[qt]
+                last[qt] = row[column]
+                li.append(ttm)
+            df[newCol] = li
         return df
-        # return df[newCol]
 
     def ttm_dict(self, dict):
         if len(dict) == 2:

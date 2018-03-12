@@ -218,16 +218,22 @@ def stock_target_test(code = '000001', target = None, idx = 0):
     stk = Stocks(code)
     if target is None:
         stk.all_target()
+        print(stk.data)
     else:
         if idx == 0:
             vs = stk.target_series(target)
-            print(vs)
+            # print(vs)
         else:
             v = stk.target_calc(target, idx)
             print(target, code, v)
         stk.save_targets()
     print(datetime.now()-t0)
 
+def stock_vector_test(target,code='000001'):
+    t0=datetime.now()
+    stk = Stocks(code)
+    stk.target_vector(target = target)
+    print(datetime.now()-t0)
 
 def index_target_test(code = '399300'):
     id = Indexs('hs300', code)
@@ -242,13 +248,6 @@ def stockgroup_test():
 if __name__ == '__main__':
     # stockgroup_test()
     # stock_target_test(code = '300104')
-    # list = get_error_list('twice')
-    # codes = [x[1] for x in list]
-    # DMgr.loop(stock_target_test, codes, 'twice')
-    # # for code in list:
-    # #     print(code)
-    # #     stock_target_test(code = code[1])
-    #
-    # # index_target_test()
     stock_target_test()
+    # stock_vector_test('EXERT')
     pass

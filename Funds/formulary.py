@@ -8,7 +8,7 @@ from .webio import *
 CAPITAL_COST = .08
 LONG_TERM_RETURN = .12
 INDEX_FLAG = 'Index_'
-RESERVED_KEYWORDS = ['math', 'log', 'log10', 'e']
+RESERVED_KEYWORDS = ['math', 'log', 'log10']
 
 
 def discount(year):
@@ -98,7 +98,7 @@ class _FinancialFormula(metaclass = SingletonMeta):
                 fs = reg_factor.findall(formula.equation)
                 fs = [x for x in fs if x not in RESERVED_KEYWORDS]
                 # get all fields included in equation
-                factor_dict[target] = fs
+                factor_dict[target] = list(set(fs))
                 # tables of equation's fields
                 tbs = [self._table_fields[x] for x in fs if x in self._table_fields]
                 tbs = list(set(tbs))
@@ -126,9 +126,6 @@ class _FinancialFormula(metaclass = SingletonMeta):
 
 
 Formula = _FinancialFormula()
-
-
-# class TimePoint:
 
 
 class Ticks(object):
@@ -171,7 +168,7 @@ class Ticks(object):
         if self.formulas is None:
             return None
         for i, formula in self.formulas.iterrows():
-            # print(i)
+            print(i)
             if formula.source != TICK:
                 self.target_series(formula.target)
         self.save_targets()
@@ -205,7 +202,7 @@ class Ticks(object):
     def _report_formula_calc(self, formula, idx = -1, prelude = np.nan):
         target = formula.target
         if abs(idx) <= self.targets.shape[0] and target in self.targets:
-            fixes_val = self.targets.ix[idx,target]
+            fixes_val = self.targets.ix[idx, target]
             if fixes_val == fixes_val:
                 return fixes_val
 
@@ -255,27 +252,26 @@ class Ticks(object):
         self.tick.ix[idx_date, formula.target] = val
         return val
 
-    def __series_reduce(self, idx_list, formula, prelude):
-        fi = 2 ** (-1 / 3)
-        iter = {
-            'sum'              : lambda list: sum(list),
-            'mean'             : lambda list: sum(list) / len(list),
-            'sd'               : lambda list: statistics.stdev(list),
-            'vix_yearly'       : lambda list: (sum([
-                x ** 2 for x in list]) * 252 / len(list)) ** 0.5,
-            'percent_geometric': lambda list: -1 + reduce(lambda accum, x: accum * (1 + x),
-                list, 1) ** (1 / len(list)),
-            'change'           : lambda list: list[-1] / list[0] - 1 if list[0] != 0 else 0,
-            'inc'              : lambda list: list[-1] - list[0],
-            'decline_avg'      : lambda list: reduce(lambda accum, x: (accum + x) * fi, list,
-                0)}
+    reduce_methods = {
+        'sum'              : lambda list: sum(list),
+        'mean'             : lambda list: sum(list) / len(list),
+        'sd'               : lambda list: statistics.stdev(list),
+        'vix_yearly'       : lambda list: (sum([
+            x ** 2 for x in list]) * 252 / len(list)) ** 0.5,
+        'percent_geometric': lambda list: -1 + reduce(lambda accum, x: accum * (1 + x),
+            list, 1) ** (1 / len(list)),
+        'change'           : lambda list: list[-1] / list[0] - 1 if list[0] != 0 else 0,
+        'inc'              : lambda list: list[-1] - list[0],
+        'decline_avg'      : lambda list: reduce(lambda accum, x: (accum + x) * 2 ** (-1 / 3), list,
+            0)}
 
+    def __series_reduce(self, idx_list, formula, prelude):
         valS = [self.__equation_val(formula, idx, prelude) for idx in idx_list]
         # pNum(formula.target, idx_list, valS, prelude,len(valS))
         if None in valS or len(valS) == 0:
             val = None
         else:
-            val = iter[formula.finale](valS)
+            val = self.reduce_methods[formula.finale](valS)
             # print(len(valS),formula.target,val,valS)
         return val
 
@@ -303,7 +299,7 @@ class Ticks(object):
 
         def _target(field):
             if havePrelude:
-                if Formula.table.at[field,'flag'] != 'addOnly':
+                if Formula.table.at[field, 'flag'] != 'addOnly':
                     raise Exception(
                         'Formula %s %s contains calculating factor while requiring prelude '
                         'could cause un-predicted '
@@ -344,7 +340,7 @@ class Ticks(object):
                     # print(idx,table,val)
                     return val
 
-        tb_funcs = {
+        tb2treat = {
             'NotInData': _target,
             'history'  : _hist,
             'balance'  : _fina,
@@ -353,7 +349,7 @@ class Ticks(object):
 
         for field in fields:
             tb = Formula.table_of(field)
-            val = tb_funcs[tb](field)
+            val = tb2treat[tb](field)
             # print('Field fetch',idx, tb, field, val)
             if val is None or val != val:
                 return None
@@ -403,11 +399,147 @@ class Ticks(object):
         warnings.warn('Zero divided! %s->%s' % (formula.equation, eqt))
 
 
-class Indexs(Ticks):
+class TickVector(Ticks):
+    def __init__(self, code, filter, table_getter: callable, type: str, refer_index = None):
+        super().__init__(code, filter, table_getter, type, refer_index)
+
+        lastTickQuarter = self.tick.iloc[-1].quarter
+        if lastTickQuarter != self.report.iloc[-1].quarter:
+            fill_missI(self.report, [lastTickQuarter], 'quarter')
+        # print(self.tick.shape,self.report.shape)
+        self.data = brief_detail_merge(self.report, self.tick, ifReduce2brief = True)
+        # self.data = pd.merge(self.data, self.targets, on = 'quarter', how = 'left')
+        self.data.index = self.data.quarter
+
+    def all_vector(self):
+        if self.formulas is None:
+            return None
+        for i, formula in self.formulas.iterrows():
+            # print(i)
+            if formula.source != TICK:
+                self.target_vector(formula)
+        tars = [x.target for x in self.formulas]
+        # self.save_targets()
+        return self.data[tars]
+
+    def target_vector(self, formula = None, target: str = None, prelude = np.nan):
+        if formula is None and target is None:
+            raise Exception(' not specified at %s %s' % (self.type, self.code))
+        if formula is not None:
+            target = formula.target
+
+        if target not in self.formulas.index:
+            self.refer_index.target_vector(target = target, prelude = prelude)
+            ref = self.refer_index.data[['quarter', target]]
+            fill_missI(ref, self.data.index, ifLabelingFilled = False)
+            result = ref[target]
+        else:
+            formula = self.formulas.loc[target] if formula is None else formula
+            prelude = formula.prelude if prelude != prelude else prelude
+            if formula.source == TICK:
+                tick_result = self._calc(self.tick, formula, prelude)
+                df = pd.DataFrame({
+                    'date': tick_result.index,
+                    target: tick_result.values})
+
+                df = reduce2brief(df)
+                fill_missI(df, self.data)
+                result = df[target]
+            else:
+                result = self._calc(self.data, formula, prelude)
+
+        # print(self.code,target, result.shape)
+        self.data[target] = result
+
+    def _calc(self, data, formula, prelude):
+        '''
+        calculate formula based on data, either ticks or quarter report
+        :param data: data frame used to calculate formula
+        :param formula:
+        :param prelude:
+        :return: series contains formula result
+        '''
+        target = formula.target
+        if target in data:
+            return None
+        else:
+            eqt, fields = self._prelude(data, formula, prelude)
+            if any([x in eqt for x in RESERVED_KEYWORDS]):
+                for field in fields:
+                    eqt = eqt.replace(field, 'row.%s' % field)
+                eqt_series = data.apply(lambda row: eval(eqt), axis = 1)
+            else:
+                eqt_series = data.eval(eqt)
+            if formula.finale != formula.finale:
+                result = eqt_series
+            else:
+                n = int(formula.duration)
+                result = eqt_series.rolling(n).apply(self.reduce_methods[formula.finale])
+            return result
+
+    def _prelude(self, data, formula, prelude):
+        '''
+        prepare fields and corresponding columns from formula
+        :param data: data frame contains/will contain fields
+        :param formula:
+        :param prelude:
+        :return: updated equation and fields
+        '''
+        eqt = formula.equation
+        fields = Formula.target_factors[formula.target]
+        if prelude != prelude:
+            for field in fields:
+                if field not in data:
+                    self.target_vector(target = field)
+            return eqt, fields
+        else:
+            def target(df, field, new_field, n):
+                self.target_vector(field)
+
+            def balance(df, field, new_field, n):
+                df[new_field] = self.data[field].rolling(n).apply(
+                    lambda li: (li[0] + li[-1]) / 2)
+
+            def ttm(df, field, new_field, n):
+                df = DWash.ttm_column(df, field, new_column = new_field, n = n)
+
+            tb2prelude = {
+                'NotInData': target,
+                'history'  : None,
+                'balance'  : balance,
+                'income'   : ttm,
+                'cash_flow': ttm}
+
+            std_duration = {
+                'year'   : 5,
+                'quarter': 2}
+            n = std_duration[prelude]
+            new_fields = []
+            for field in fields:
+                if field in new_fields:
+                    continue
+                tb = Formula.table_of(field)
+                func = tb2prelude[tb]
+                if func is None:
+                    new_fields.append(field)
+                else:
+                    if tb == 'NotInData':
+                        new_field = field
+                    else:
+                        new_field = field + TTM_SUFFIX + str(n)
+                    if new_field not in data:
+                        func(data, field, new_field, n)
+                    new_fields.append(new_field)
+                    eqt = eqt.replace(field, new_field)
+            return eqt, new_fields
+
+
+class Indexs(TickVector):
 
     def __init__(self, label, code, ifUpdate = False):
         def __get_table():
             tick = DMgr.read_csv('index', self.code)
+            remove_duplicateI(tick)
             for col in ['market_cap', 'circulating_market_cap', 'net_profit']:
                 if col in tick:
                     tick.drop(col, axis = 1, inplace = True)
@@ -488,7 +620,7 @@ HS300 = Indexs(*Idx_dict['HS300'])
 # todo Dupt  detail into ATO
 # todo compare MG & MS cross the market
 
-class Stocks(Ticks):
+class Stocks(TickVector):
 
     def __init__(self, code):
         def __get_table():
@@ -502,7 +634,7 @@ class Stocks(Ticks):
                         report = df
                     else:
                         report = pd.merge(report, df, on = 'quarter',
-                            suffixes = ('', DWash.DuplicatedFlag))
+                            suffixes = ('', tb + DWash.DuplicatedFlag))
             if report.shape[0] > 0:
                 DWash.column_regularI(report, 'financial_set')
                 report.index = report.quarter
