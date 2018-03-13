@@ -1,4 +1,3 @@
-from numba import jit
 from datetime import datetime, timedelta, date
 
 DATE_SEPARATOR = '-'
@@ -70,40 +69,41 @@ def std_date_str(str):
 
 
 def __parse_date(date_str):
+    if date_str is None or date_str != date_str:
+        return None, None, None
+    dt = None
     if isinstance(date_str, date):
-        return date_str
+        dt = date_str
     if isinstance(date_str, datetime):
-        return date_str.date()
+        dt = date_str.date()
     if date_str == 'non-give':
         dt = now()
-        return dt.year, dt.month, dt.day
-    else:
-        if date_str is None or date_str != date_str:
+    if dt is not None:
+        return str(dt.year), str(dt.month).zfill(2), dt.day
+
+    if isinstance(date_str, str):
+        y, m, d = __parse_str(date_str)
+        if y is None:
             return None, None, None
-        elif isinstance(date_str, str):
-            y, m, d = __parse_str(date_str)
-            if y is None:
-                return None, None, None
-            else:
-                return y, m, d
         else:
-            raise Exception('%s unpredicted!' % date_str)
-    # return dt.date()
+            return y, m, d
+
+    raise Exception('%s unpredicted!' % date_str)
+
+
+month_quarters = [['03', QUARTER_SEPARATOR + '1'], ['06', QUARTER_SEPARATOR + '2'],
+                  ['09', QUARTER_SEPARATOR + '3'],
+                  ['12', QUARTER_SEPARATOR + '4']]
 
 
 def to_quarter(date_str = 'non-give'):
-    assert isinstance(date_str, str)
+    # assert isinstance(date_str, str)
     year, month, day = __parse_date(date_str)
-
     if year is None:
         return None
-    stdd = std_date(year, month, day)
-    qrt = [[std_date(year, '03', '31'), 1], [std_date(year, '06', '30'), 2],
-           [std_date(year, '09', '30'), 3],
-           [std_date(year, '12', '31'), 4]]
-    for t in qrt:
-        if stdd <= t[0]:
-            return '%s%s%s' % (year, QUARTER_SEPARATOR, t[1])
+    for t in month_quarters:
+        if month <= t[0]:
+            return year + t[1]
 
 
 def to_year(date_str = 'non-give'):

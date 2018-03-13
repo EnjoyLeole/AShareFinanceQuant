@@ -105,13 +105,12 @@ def brief_detail_merge(brief, detail, ifReduce2brief = False, brief_col = 'quart
             df_reduced = fill_miss(df_reduced, brief.index, brief_col)
         detail = df_reduced
         method = 'left'
-        valid = '1:m'
+        # valid = '1:m'
     else:
         brief = fill_miss(brief, detail[brief_col], brief_col)
         method = 'right'
-        valid = '1:m'
-    df = pd.merge(brief, detail, on = brief_col, how = method, validate = valid,
-        suffixes = ['', DUPLICATE_FLAG])
+        # valid = '1:m'
+    df = pd.merge(brief, detail, on = brief_col, how = method, suffixes = ['', DUPLICATE_FLAG])
     df.sort_values([brief_col, detail_col], inplace = True)
     # cols=sorted(df.columns.values)
     # pco=sorted(set(cols))
@@ -266,9 +265,9 @@ DMgr = _DataManager()
 
 
 class _DataWasher(metaclass = SingletonMeta):
-    # region column name regular
     COLUMN_UPDATE = True
     WARNING_LEVEL = 0.5
+    DuplicatedFlag = '*2'
 
     def __init__(self):
         self.mapper = get_lib('mapper')
@@ -283,13 +282,13 @@ class _DataWasher(metaclass = SingletonMeta):
                 f.write('{}')
         self.matched = file2obj(self.match_path)
 
+    # region column name regular
+
     def _simplify_name(cls, name):
         swap_pair = [['所有者', '股东'], ['的', ''], ['所', '']]
         for pair in swap_pair:
             name = name.replace(*pair)
         return name
-
-    DuplicatedFlag = '*2'
 
     def _column_match(self, df: pd.DataFrame, category = ''):
         matches = {}
@@ -484,24 +483,30 @@ class _DataWasher(metaclass = SingletonMeta):
         df = df.sort_values('quarter')
         if n == 2:
             col = df[column].fillna(method = 'pad')
-            shift = col.shift(1)
             df['quart'] = df['quarter'].apply(lambda x: x.split(QUARTER_SEPARATOR)[1])
-            df[new_column] = col - shift
-            ttms = df.apply(lambda row: row[column] if row['quart'] == '1' else row[newCol],
-                axis = 1)
+            last_col = 'last' + column
+            df[last_col] = col.shift(1)
+
+            def ttm2(row):
+                cur = row[column]
+                last = row[last_col]
+                res = cur if row['quart'] == '1' else cur - last
+                return res if cur > 0 else last
+
+            ttms = df.apply(ttm2, axis = 1)
         else:
             last = [0, 0, 0, 0, 0]
-            ttms = []
-            for key, row in df.iterrows():
+
+            def get_ttm(row, last):
                 cur = row[column]
                 qs = row['quarter']
-
                 year, qt = qs.split(QUARTER_SEPARATOR)
                 qt = int(qt)
                 ttm = cur + last[4] - last[qt]
-                last[qt] = row[column]
-                ttms.append(ttm)
-            # df[newCol] = li
+                last[qt] = cur
+                return ttm
+
+            ttms = df.apply(lambda row: get_ttm(row, last), axis = 1)
         return ttms
 
     def ttm_dict(self, dict):

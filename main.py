@@ -7,6 +7,9 @@ simples = {
     'zzd'   : '002069',
     'bym'   : '002570',
     'maotai': '600519'}
+hr='600276'
+letv = '300104'
+mt = '600519'
 bcode = '000001'
 code = '300104'
 sts = '2018-01-01'
@@ -225,11 +228,11 @@ def stock_target_test(code = '000001', target = None, idx = 0):
     print(datetime.now() - t0)
 
 
-def stock_vector_test(target = None, code = bcode):
+def stock_vector_test(target = None, code = hr):
     t0 = datetime.now()
     stk = Stocks(code)
     if target is None:
-        stk.all_vector()
+        df_res = stk.all_vector()
     else:
         stk.target_vector(target = target)
     print(datetime.now() - t0)

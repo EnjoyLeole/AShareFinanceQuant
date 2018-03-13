@@ -398,19 +398,18 @@ class Ticks(object):
 
 
 class TickVector(Ticks):
-    IfForceRenew = True
+    IfRenew = False
 
     def __init__(self, code, filter, table_getter: callable, type: str, refer_index = None):
         super().__init__(code, filter, table_getter, type, refer_index)
 
         lastTickQuarter = self.tick.iloc[-1].quarter
         if lastTickQuarter != self.report.iloc[-1].quarter:
-            # if code=='000001':
-            #     print(code)
             self.report = fill_miss(self.report, [lastTickQuarter], 'quarter')
-        # print(self.tick.shape,self.report.shape)
+        # print(self.code)
         self.data = brief_detail_merge(self.report, self.tick, ifReduce2brief = True)
-        # self.data = pd.merge(self.data, self.targets, on = 'quarter', how = 'left')
+        if not self.IfRenew:
+            self.data = pd.merge(self.data, self.targets, on = 'quarter', how = 'left')
         self.data.index = self.data.quarter
 
     def all_vector(self):
@@ -532,7 +531,7 @@ class TickVector(Ticks):
                 return eqt, new_fields
 
         target = formula.target
-        if not self.IfForceRenew and target in data:
+        if not self.IfRenew and target in data:
             return data[target]
 
         else:
@@ -572,10 +571,10 @@ class Indexs(TickVector):
             else:
                 report = DMgr.read_csv('index', self.elements_quarter)
                 daily = DMgr.read_csv('index', self.elements_daily)
-            df = pd.merge(tick, daily, on = 'date', how = 'left')
-            tick = brief_detail_merge(report, df, ifReduce2brief = False,
-                brief_col = 'quarter',
-                detail_col = 'date')
+            tick = pd.merge(tick, daily, on = 'date', how = 'left')
+            # tick = brief_detail_merge(report, df, ifReduce2brief = False,
+            #     brief_col = 'quarter',
+            #     detail_col = 'date')
             return report, tick
 
         self.label = label
@@ -660,6 +659,9 @@ class Stocks(TickVector):
 
             tick = DMgr.read_csv('stock', code)
             if tick is not None:
+                for col in ['Rmonthly', 'SIGMA', 'RSIZE', 'PRICE']:
+                    if col in tick:
+                        tick.drop(col, axis = 1)
                 tick = tick[tick.close != 0]
                 DWash.get_changeI(tick)
                 tick.sort_values('date', inplace = True)
