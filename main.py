@@ -1,11 +1,6 @@
-from Funds.formulary import *
 from Funds.statistic import *
-import tushare as ts
 from Citics.trade import *
-from Basic.IO import *
-import ast
 from Meta import *
-import inspect
 
 simples = {
     'letv'  : '300104',
@@ -214,11 +209,11 @@ def error_reshow(name):
 # endregion
 
 def stock_target_test(code = '000001', target = None, idx = 0):
-    t0=datetime.now()
+    t0 = datetime.now()
     stk = Stocks(code)
     if target is None:
         stk.all_target()
-        print(stk.data)
+        # print(stk.data)
     else:
         if idx == 0:
             vs = stk.target_series(target)
@@ -227,13 +222,27 @@ def stock_target_test(code = '000001', target = None, idx = 0):
             v = stk.target_calc(target, idx)
             print(target, code, v)
         stk.save_targets()
-    print(datetime.now()-t0)
+    print(datetime.now() - t0)
 
-def stock_vector_test(target,code='000001'):
-    t0=datetime.now()
+
+def stock_vector_test(target = None, code = bcode):
+    t0 = datetime.now()
     stk = Stocks(code)
-    stk.target_vector(target = target)
-    print(datetime.now()-t0)
+    if target is None:
+        stk.all_vector()
+    else:
+        stk.target_vector(target = target)
+    print(datetime.now() - t0)
+
+
+def stock_calc_compare():
+    stk = Stocks(simples['letv'])
+    df2 = stk.all_vector()
+    df1 = stk.all_target()
+
+    df = df2['Zscore'] - df1['Zscore']
+    print(df)
+
 
 def index_target_test(code = '399300'):
     id = Indexs('hs300', code)
@@ -248,6 +257,7 @@ def stockgroup_test():
 if __name__ == '__main__':
     # stockgroup_test()
     # stock_target_test(code = '300104')
-    stock_target_test()
-    # stock_vector_test('EXERT')
+    # stock_target_test()
+    stock_vector_test()
+    # stock_calc_compare()
     pass

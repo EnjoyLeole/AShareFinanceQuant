@@ -1,4 +1,4 @@
-# import datetime
+from numba import jit
 from datetime import datetime, timedelta, date
 
 DATE_SEPARATOR = '-'
@@ -10,11 +10,18 @@ INTERVAL_ORDER = {
     'month'  : 2,
     'date'   : 3}
 
+
 def today():
     return datetime.now().date()
 
+
 def now():
     return datetime.now()
+
+
+def date_of(year, month, day):
+    return datetime(year, month, day).date()
+
 
 def str2date(str, day_delta = 0):
     if '-' in str:
@@ -32,67 +39,87 @@ def str2date(str, day_delta = 0):
         date = None
     return date
 
-def date_str(date, separate = DATE_SEPARATOR):
-    return date.strftime("%Y" + separate + "%m" + separate + "%d")
+
+def date_str(date):
+    return std_date(date.year, date.month, date.day)
+
 
 def std_date(year, month, day):
     return '%s%s%s%s%s' % (year, DATE_SEPARATOR, month, DATE_SEPARATOR, day)
 
-def std_date_str(str):
+
+def __parse_str(str):
     if str != str:
-        return None
+        return None, None, None
     if '/' in str:
         sep = '/'
-    else:
+    elif '-' in str:
         sep = '-'
+    else:
+        return None, None, None
+    # print(str)
     year, m, d = str.split(sep)
     m = m.zfill(2)
     d = d.zfill(2)
+    return year, m, d
+
+
+def std_date_str(str):
+    year, m, d = __parse_str(str)
     return std_date(year, m, d)
 
-def date_of(year, month, day):
-    return datetime(year, month, day).date()
 
-def __get_date(date_str):
+def __parse_date(date_str):
     if isinstance(date_str, date):
         return date_str
     if isinstance(date_str, datetime):
         return date_str.date()
     if date_str == 'non-give':
         dt = now()
+        return dt.year, dt.month, dt.day
     else:
         if date_str is None or date_str != date_str:
-            return None
+            return None, None, None
         elif isinstance(date_str, str):
-            dt = str2date(date_str)
-            if dt is None:
-                return None
+            y, m, d = __parse_str(date_str)
+            if y is None:
+                return None, None, None
+            else:
+                return y, m, d
         else:
             raise Exception('%s unpredicted!' % date_str)
-    return dt.date()
+    # return dt.date()
+
 
 def to_quarter(date_str = 'non-give'):
-    dt = __get_date(date_str)
-    if dt is None:
+    assert isinstance(date_str, str)
+    year, month, day = __parse_date(date_str)
+
+    if year is None:
         return None
-    yr = dt.year
-    qrt = [[date(yr, 3, 31), 1], [date(yr, 6, 30), 2], [date(yr, 9, 30), 3],
-           [date(yr, 12, 31), 4]]
+    stdd = std_date(year, month, day)
+    qrt = [[std_date(year, '03', '31'), 1], [std_date(year, '06', '30'), 2],
+           [std_date(year, '09', '30'), 3],
+           [std_date(year, '12', '31'), 4]]
     for t in qrt:
-        if dt <= t[0]:
-            return '%s%s%s' % (yr, QUARTER_SEPARATOR, t[1])
+        if stdd <= t[0]:
+            return '%s%s%s' % (year, QUARTER_SEPARATOR, t[1])
+
 
 def to_year(date_str = 'non-give'):
-    dt = __get_date(date_str)
+    dt = __parse_date(date_str)
     return dt.year
 
+
 def to_month(date_str = 'non-give'):
-    dt = __get_date(date_str)
+    dt = __parse_date(date_str)
     return '%s-%s' % (dt.year, dt.month)
+
 
 def quarter2year(quarter):
     year, qt = quarter.split(QUARTER_SEPARATOR)
     return year
+
 
 def month2quarter(month):
     for note in ['.', '-', '/']:
@@ -101,18 +128,20 @@ def month2quarter(month):
     year, m = month.split(sep)
     return m
 
+
 def quarter_dates(quarter):
     year, qt = quarter.split(QUARTER_SEPARATOR)
     dates = {
-        '1': (('01', '01'), ('03', 31)),
-        '2': (('04', '01'), ('06', 30)),
-        '3': (('07', '01'), ('09', 30)),
-        '4': ((10, '01'), (12, 31))}
+        '1': (('01', '01'), ('03', '31')),
+        '2': (('04', '01'), ('06', '30')),
+        '3': (('07', '01'), ('09', '30')),
+        '4': (('10', '01'), ('12', '31'))}
     dts = dates[qt]
 
     start = std_date(year, dts[0][0], dts[0][1])
     end = std_date(year, dts[1][0], dts[1][1])
     return start, end
+
 
 INTERVAL_TRANSFER = {
     ('quarter', 'year') : quarter2year,
@@ -120,6 +149,7 @@ INTERVAL_TRANSFER = {
     ('date', 'year')    : to_year,
     ('date', 'quarter') : to_quarter,
     ('date', 'month')   : to_month}
+
 
 def quarter_add(quarter, i):
     year, q = quarter.split(QUARTER_SEPARATOR)

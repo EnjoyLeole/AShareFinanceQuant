@@ -4,7 +4,6 @@ from Basic.IO import *
 import time, os, re
 import numpy as np
 import pandas as pd
-import math
 from urllib3 import PoolManager
 
 OLDEST_DATE = '1988-01-01'
@@ -49,22 +48,26 @@ def remove_duplicateI(df):
     df.drop(dups, axis = 1, inplace = True)
 
 
-def fill_missI(df, refer_idxs, brief_col = 'quarter', ifLabelingFilled = True):
+def fill_miss(df, refer_idxs, brief_col = 'quarter', ifLabelingFilled = True):
     # brief_col = 'index' if brief_col is None else brief_col
     missing = [x for x in refer_idxs if x not in df[brief_col].values]
     missing = list(set(missing))
     if ifLabelingFilled:
         df[FORCE_FILLED] = False
     for qt in missing:
-        cands = df[df[brief_col] > qt][brief_col]
-        if cands.shape[0] > 0:
-            chosen = cands[0]
-        else:
-            chosen = df[brief_col][-1]
-        df.loc[qt] = df.loc[chosen]
+        # if qt is None:
+        #     continue
+        # cands = df[df[brief_col] > qt][brief_col]
+        # if cands.shape[0] > 0:
+        #     chosen = cands[0]
+        # else:
+        #     chosen = df[brief_col][-1]
+        # df.loc[qt] =None
+
         df.loc[qt, brief_col] = qt
         if ifLabelingFilled:
             df.loc[qt, FORCE_FILLED] = True
+    df = df.fillna(method = 'pad')
     return df
 
 
@@ -73,9 +76,10 @@ def reduce2brief(df, brief_col = 'quarter', detail_col = 'date'):
         detail2brief_func = INTERVAL_TRANSFER[(detail_col, brief_col)]
         df[brief_col] = df[detail_col].apply(detail2brief_func)
     group = df.groupby(brief_col).agg({
-        detail_col: 'max'})
-    flag = df[detail_col].apply(lambda x: True if x in group.values else False)
-    df_reduced = df[flag].copy()
+        detail_col: 'max'})[detail_col].tolist()
+    df.index = df[detail_col]
+    # flag = df[detail_col].apply(lambda x: True if x in group.values else False)
+    df_reduced = df.ix[group].copy()
     df_reduced.index = df_reduced[brief_col]
     return df_reduced
 
@@ -98,12 +102,12 @@ def brief_detail_merge(brief, detail, ifReduce2brief = False, brief_col = 'quart
     if ifReduce2brief:
         df_reduced = reduce2brief(detail, brief_col, detail_col)
         if df_reduced.shape[0] < brief.shape[0]:
-            df_reduced = fill_missI(df_reduced, brief.index, brief_col)
+            df_reduced = fill_miss(df_reduced, brief.index, brief_col)
         detail = df_reduced
         method = 'left'
         valid = '1:m'
     else:
-        brief = fill_missI(brief, detail[brief_col], brief_col)
+        brief = fill_miss(brief, detail[brief_col], brief_col)
         method = 'right'
         valid = '1:m'
     df = pd.merge(brief, detail, on = brief_col, how = method, validate = valid,
@@ -128,6 +132,7 @@ class _DataManager(metaclass = SingletonMeta):
         codes = re.compile('(\d+)')
         self.idx_list = []
         for file in os.listdir(folder):
+            # print(1)
             code = codes.search(file)[0]
             self.idx_list.append(code)
 
@@ -478,23 +483,15 @@ class _DataWasher(metaclass = SingletonMeta):
 
         df = df.sort_values('quarter')
         if n == 2:
-            # def t2(row):
-            #     if first in row.quarter:
-            #         return row[column]
-            #     else:
-            #         return row[column]
-
-            shift = df[column].shift(1)
+            col = df[column].fillna(method = 'pad')
+            shift = col.shift(1)
             df['quart'] = df['quarter'].apply(lambda x: x.split(QUARTER_SEPARATOR)[1])
-            df[newCol] = df[column] - shift
-            df[newCol] = df.apply(lambda row: row[column] if row['quart'] == '1' else row[newCol],
+            df[new_column] = col - shift
+            ttms = df.apply(lambda row: row[column] if row['quart'] == '1' else row[newCol],
                 axis = 1)
-            # print(df[newCol])
-            # df[newCol] = df[['quarter', column]].apply(t2, axis = 1)
-
         else:
             last = [0, 0, 0, 0, 0]
-            li = []
+            ttms = []
             for key, row in df.iterrows():
                 cur = row[column]
                 qs = row['quarter']
@@ -503,9 +500,9 @@ class _DataWasher(metaclass = SingletonMeta):
                 qt = int(qt)
                 ttm = cur + last[4] - last[qt]
                 last[qt] = row[column]
-                li.append(ttm)
-            df[newCol] = li
-        return df
+                ttms.append(ttm)
+            # df[newCol] = li
+        return ttms
 
     def ttm_dict(self, dict):
         if len(dict) == 2:

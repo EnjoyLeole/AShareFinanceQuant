@@ -105,7 +105,7 @@ class N163(object):
                            'volume', 'change_rate'])
 
             df.drop(['volume', 'change_rate'], axis = 1, inplace = True)
-            df['date'] = df['date'].apply(lambda row: date_str(str2date(row)))
+            df['date'] = df['date'].apply(lambda row: std_date_str)
             return df
 
         derc = pd.DataFrame()
