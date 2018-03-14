@@ -165,18 +165,18 @@ class _DataManager(metaclass = SingletonMeta):
         if not os.path.exists(path):
             return None
         df = pd.read_csv(path, encoding = GBK)
-        DWash.value_scale_by_column_name(df)
-        # print(df)
-        if ifRegular:
-            DWash.column_regularI(df, category)
+        # DWash.value_scale_by_column_name(df)
+        # # print(df)
+        # if ifRegular:
+        #     DWash.column_regularI(df, category)
         return df
 
     def save_csv(self, df: pd.DataFrame, category, code, encode = GBK, index = False,
                  ifRegular = True):
         path = self.__csv_path(category, code)
-        DWash.value_scale_by_column_name(df)
-        if ifRegular:
-            DWash.column_regularI(df, category)
+        # DWash.value_scale_by_column_name(df)
+        # if ifRegular:
+        #     DWash.column_regularI(df, category)
         df.to_csv(path, index = index, encoding = encode)
 
     def update_csv(self, category, code, fetcher, index = 'date'):
@@ -406,6 +406,11 @@ class _DataWasher(metaclass = SingletonMeta):
 
     # endregion
 
+    def raw_regularI(self, df: pd.DataFrame, category = ''):
+        self.replaceI(df)
+        self.value_scale_by_column_name(df)
+        self.column_regularI(df, category)
+
     # region one time active for files
 
     def simplify_dirs(cls, category):
@@ -452,7 +457,6 @@ class _DataWasher(metaclass = SingletonMeta):
                     # print('%s has a shape %s which is incorrect! %s' % (col, df[col].shape, e))
 
     def value_scale_by_column_name(self, df: pd.DataFrame):
-        self.replaceI(df)
         for col in df:
             if '万元' in col:
                 self._numericI(df, col)

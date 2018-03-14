@@ -91,14 +91,13 @@ def __parse_date(date_str):
     raise Exception('%s unpredicted!' % date_str)
 
 
-month_quarters = [['03', QUARTER_SEPARATOR + '1'], ['06', QUARTER_SEPARATOR + '2'],
-                  ['09', QUARTER_SEPARATOR + '3'],
-                  ['12', QUARTER_SEPARATOR + '4']]
-
-
 def to_quarter(date_str = 'non-give'):
     # assert isinstance(date_str, str)
     year, month, day = __parse_date(date_str)
+    month_quarters = [['03', QUARTER_SEPARATOR + '1'], ['06', QUARTER_SEPARATOR + '2'],
+                      ['09', QUARTER_SEPARATOR + '3'],
+                      ['12', QUARTER_SEPARATOR + '4']]
+
     if year is None:
         return None
     for t in month_quarters:

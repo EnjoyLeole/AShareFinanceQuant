@@ -7,7 +7,7 @@ simples = {
     'zzd'   : '002069',
     'bym'   : '002570',
     'maotai': '600519'}
-hr='600276'
+hr = '600276'
 letv = '300104'
 mt = '600519'
 bcode = '000001'
@@ -211,40 +211,16 @@ def error_reshow(name):
 
 # endregion
 
-def stock_target_test(code = '000001', target = None, idx = 0):
-    t0 = datetime.now()
-    stk = Stocks(code)
-    if target is None:
-        stk.all_target()
-        # print(stk.data)
-    else:
-        if idx == 0:
-            vs = stk.target_series(target)
-            # print(vs)
-        else:
-            v = stk.target_calc(target, idx)
-            print(target, code, v)
-        stk.save_targets()
-    print(datetime.now() - t0)
-
 
 def stock_vector_test(target = None, code = hr):
     t0 = datetime.now()
     stk = Stocks(code)
     if target is None:
-        df_res = stk.all_vector()
+        df_res = stk.calc_all_vector()
+        stk.save_targets()
     else:
-        stk.target_vector(target = target)
+        stk.calc_target_vector(target = target)
     print(datetime.now() - t0)
-
-
-def stock_calc_compare():
-    stk = Stocks(simples['letv'])
-    df2 = stk.all_vector()
-    df1 = stk.all_target()
-
-    df = df2['Zscore'] - df1['Zscore']
-    print(df)
 
 
 def index_target_test(code = '399300'):

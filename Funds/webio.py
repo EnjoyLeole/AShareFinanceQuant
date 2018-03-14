@@ -61,9 +61,10 @@ class N163(object):
             # print(url)
             df = pd.read_csv(url, encoding = GBK)
             df.set_index(df.columns[0], inplace = True)
-            DWash.replaceI(df, '--', 0)
+            # DWash.replaceI(df, '--', 0)
             df.dropna(1, 'all', inplace = True)
             df = df.T.reset_index()
+            DWash.raw_regularI(df, 'raw_finance_' + cate)
             df.rename(columns = {
                 "index": "date"}, inplace = True)
             DMgr.save_csv(df, cate, code)
@@ -133,7 +134,7 @@ class N163(object):
         # print(url)
         df = pd.read_csv(url, encoding = GBK)
         flag = 'index_tick' if index else 'hist_tick'
-        DWash.column_regularI(df, flag)
+        DWash.raw_regularI(df, flag)
         df.sort_values('date', inplace = True)
         return df
 
