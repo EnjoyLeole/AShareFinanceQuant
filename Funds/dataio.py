@@ -199,7 +199,7 @@ class _DataManager(metaclass = SingletonMeta):
                 __msg('Last update in %s days, assume filled!' % dist.days)
                 return exist
             start = str2date(start, 1).date()
-            start = date_str(start)
+            start = date2str(start)
 
         new = fetcher(start)
         if new is None:
@@ -211,25 +211,25 @@ class _DataManager(metaclass = SingletonMeta):
             DMgr.save_csv(new, category, code)
             return new
 
-    def loop(self, func, code_list, flag = '', times = 1, delay = 0, showSeq = False, limit = -1):
+    def loop(self, func, para_list, flag = '', times = 1, delay = 0, showSeq = False, limit = -1):
         fails = []
         count = 0
-        for code in code_list:
+        for para in para_list:
             if count > limit and limit > 0:  break
             if showSeq:
-                print(count, flag, code)
+                print(count, flag, para)
             for i in range(times):
                 try:
-                    func(code)
+                    func(para)
                 except TimeoutError as e:
                     if i == times - 1:
                         print(e)
-                        fails.append([flag, code])
+                        fails.append([flag, para])
                     if delay > 0:
                         time.sleep(delay)
                 except Exception as e:
                     print(e)
-                    fails.append([flag, code])
+                    fails.append([flag, para])
             count += 1
 
         if len(fails) > 0:

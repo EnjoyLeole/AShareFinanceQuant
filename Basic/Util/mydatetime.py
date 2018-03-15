@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, date
 
+
 DATE_SEPARATOR = '-'
 QUARTER_SEPARATOR = 'Q'
 
@@ -39,11 +40,11 @@ def str2date(str, day_delta = 0):
     return date
 
 
-def date_str(date):
-    return std_date(date.year, date.month, date.day)
+def date2str(date):
+    return __std_date(date.year, date.month, date.day)
 
 
-def std_date(year, month, day):
+def __std_date(year, month, day):
     return '%s%s%s%s%s' % (year, DATE_SEPARATOR, month, DATE_SEPARATOR, day)
 
 
@@ -63,9 +64,9 @@ def __parse_str(str):
     return year, m, d
 
 
-def std_date_str(str):
+def date_str2std(str):
     year, m, d = __parse_str(str)
-    return std_date(year, m, d)
+    return __std_date(year, m, d)
 
 
 def __parse_date(date_str):
@@ -106,13 +107,17 @@ def to_quarter(date_str = 'non-give'):
 
 
 def to_year(date_str = 'non-give'):
-    dt = __parse_date(date_str)
-    return dt.year
+    year, month, day = __parse_date(date_str)
+    if year is None:
+        return None
+    return year
 
 
 def to_month(date_str = 'non-give'):
-    dt = __parse_date(date_str)
-    return '%s-%s' % (dt.year, dt.month)
+    year, month, day = __parse_date(date_str)
+    if year is not None:
+        return '%s-%s' % (year, month)
+    return None
 
 
 def quarter2year(quarter):
@@ -137,8 +142,8 @@ def quarter_dates(quarter):
         '4': (('10', '01'), ('12', '31'))}
     dts = dates[qt]
 
-    start = std_date(year, dts[0][0], dts[0][1])
-    end = std_date(year, dts[1][0], dts[1][1])
+    start = __std_date(year, dts[0][0], dts[0][1])
+    end = __std_date(year, dts[1][0], dts[1][1])
     return start, end
 
 

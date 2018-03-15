@@ -1,6 +1,8 @@
 from Funds.statistic import *
 from Citics.trade import *
 from Meta import *
+from timeit import timeit
+import numpy
 
 simples = {
     'letv'  : '300104',
@@ -213,30 +215,49 @@ def error_reshow(name):
 
 
 def stock_vector_test(target = None, code = hr):
-    t0 = datetime.now()
+    # t0 = datetime.now()
     stk = Stocks(code)
     if target is None:
         df_res = stk.calc_all_vector()
-        stk.save_targets()
+        # stk.save_targets()
     else:
         stk.calc_target_vector(target = target)
-    print(datetime.now() - t0)
+    # print(datetime.now() - t0)
 
 
 def index_target_test(code = '399300'):
     id = Indexs('hs300', code)
-    id.all_target()
+    id.calc_all_vector()
 
 
 def stockgroup_test():
-    all = StockGroups(DMgr.code_list)
-    all.all_targets()
+    for code in DMgr.code_list.head(10):
+        stock_vector_test(code = code)
+
+
+def test():
+    stock_vector_test()
+
+
+li = [x for x in range(100)]
+li = numpy.array(li)
+
+
+def python(arr = li):
+    val = sum(arr)
+    # print(val)
+
+
+@numba.jit
+def numba(arr = li):
+    val = sum(arr)
+    # print(val)
 
 
 if __name__ == '__main__':
-    # stockgroup_test()
-    # stock_target_test(code = '300104')
-    # stock_target_test()
-    stock_vector_test()
-    # stock_calc_compare()
-    pass
+    # test()
+    print(timeit(test, number = 1))
+    times=100000
+    # pNum('python', timeit(python,number=times))
+    # numba()
+    # pNum('numba', timeit(numba,number=times))

@@ -106,7 +106,7 @@ class N163(object):
                            'volume', 'change_rate'])
 
             df.drop(['volume', 'change_rate'], axis = 1, inplace = True)
-            df['date'] = df['date'].apply(lambda row: std_date_str)
+            df['date'] = df['date'].apply(lambda row: date_str2std)
             return df
 
         derc = pd.DataFrame()
@@ -127,8 +127,8 @@ class N163(object):
     @classmethod
     def fetch_hist(cls, code, start = None, end = None, index = False):
         end = today() if end is None else end
-        start_str = date_str(start, '')
-        end_str = date_str(end, '')
+        start_str = date2str(start, '')
+        end_str = date2str(end, '')
         i = (0 if code[0] == '0' else 1) if index else (0 if code[0] == '6' else 1)
         url = cls.url_his % (i, code, start_str, end_str)
         # print(url)
@@ -157,7 +157,7 @@ class N163(object):
         df = DMgr.read_csv(category, code)
         if df is None:
             return None
-        df.date = df.date.apply(std_date_str)
+        df.date = df.date.apply(date_str2std)
 
         df.index = df.date
         filter = df[df.date >= '2015-01-01'].date
@@ -404,7 +404,7 @@ class Tuget(object):
 
     @classmethod
     def fetch_his_factor(cls, code, start = None, end = None, autype = None):
-        df = ts.get_h_data(code, date_str(start), date_str(end), autype = autype,
+        df = ts.get_h_data(code, date2str(start), date2str(end), autype = autype,
             drop_factor = False, )
         return df
 

@@ -3,6 +3,7 @@ import statistics
 import warnings
 from functools import reduce
 from .webio import *
+import numba
 
 CAPITAL_COST = .08
 LONG_TERM_RETURN = .12
@@ -79,6 +80,35 @@ class Macro(object):
     #     DMgr.save_csv(merged, 'temp', 'market_pe')
 
 
+# region reduce methods
+
+@numba.jit
+def increase(arr):
+    return arr[-1] - arr[0]
+
+
+@numba.jit
+def change(arr):
+    return arr[-1] / arr[0] - 1 if arr[0] != 0 else 0
+
+
+@numba.jit
+def vix_yearly(arr):
+    return (sum(arr ** 2) * 252 / len(arr)) ** 0.5
+
+
+@numba.jit
+def percent_geometric(arr):
+    return -1 + reduce(lambda accum, x: accum * (1 + x), arr, 1) ** (1 / len(arr))
+
+
+@numba.jit
+def decline_avg(arr):
+    return reduce(lambda accum, x: (accum + x) * 2 ** (-1 / 3), arr, 0)
+
+
+# endregion
+
 class _FinancialFormula(metaclass = SingletonMeta):
 
     def __init__(self):
@@ -123,12 +153,26 @@ class _FinancialFormula(metaclass = SingletonMeta):
             return self._table_fields[field]
         return 'NotInData'
 
+    reduce_methods = {
+        'sum'              : sum,
+        'sd'               : statistics.stdev,
+        'mean'             : lambda arr: arr.mean(),
+        'vix_yearly'       : vix_yearly,
+        'percent_geometric': percent_geometric,
+        'change'           : change,
+        'inc'              : increase,
+        'decline_avg'      : decline_avg}
+
 
 Formula = _FinancialFormula()
 
 
 class Ticks(object):
     IfRenew = True
+
+    std_duration = {
+        'year'   : 5,
+        'quarter': 2}
 
     def __init__(self, code, filter, table_getter: callable, type: str, refer_index = None):
         self.formulas = Formula.table[Formula.table.target.apply(filter)]
@@ -143,7 +187,7 @@ class Ticks(object):
                 self.formulas = None
                 warnings.warn('%s %s dont have data!' % (type, code))
                 return None, None
-            tick.date = tick.date.apply(std_date_str)
+            tick.date = tick.date.apply(date_str2std)
             tick.index = tick.date
             tick['quarter'] = tick.date.apply(to_quarter)
             # self.lastQuarter = self.report['quarter'].iloc[-1]
@@ -157,8 +201,8 @@ class Ticks(object):
 
         self.target_category = self.type + '_target'
 
-        self.data = brief_detail_merge(self.report, self.tick, ifReduce2brief = True)
-        self.data.index = self.data.quarter
+        self.major = brief_detail_merge(self.report, self.tick, ifReduce2brief = True)
+        self.major.index = self.major.quarter
 
         def target_saved_fetch():
             targets = DMgr.read_csv(self.target_category, code)
@@ -176,7 +220,7 @@ class Ticks(object):
                 if idx in self.tick:
                     self.tick = self.tick.drop(idx, axis = 1)
         else:
-            self.data = pd.merge(self.data, self.targets, on = 'quarter', how = 'left')
+            self.major = pd.merge(self.major, self.targets, on = 'quarter', how = 'left')
 
     def save_targets(self):
         DMgr.save_csv(self.targets, self.target_category, self.code)
@@ -191,7 +235,7 @@ class Ticks(object):
             cols.append(i)
             if formula.source != TICK:
                 self.calc_target_vector(formula)
-        self.targets = self.data[cols]
+        self.targets = self.major[cols]
         return self.targets
 
     def calc_target_vector(self, formula = None, target: str = None, prelude = np.nan):
@@ -208,7 +252,7 @@ class Ticks(object):
             if target not in self.formulas.index:
                 self.refer_index.calc_target_vector(target = target, prelude = prelude)
                 tick_result = self.refer_index.tick[target]
-                result = self.refer_index.data[target]
+                result = self.refer_index.major[target]
                 # fill_missI(ref, self.tick.index, 'date', ifLabelingFilled = False)
                 # df = ref
             else:
@@ -217,7 +261,7 @@ class Ticks(object):
                     'date': tick_result.index,
                     target: tick_result.values})
                 df = reduce2brief(df)
-                df = fill_miss(df, self.data.index)
+                df = fill_miss(df, self.major.index)
                 result = df[target]
             self.tick[target] = tick_result
 
@@ -225,13 +269,13 @@ class Ticks(object):
             if target not in self.formulas.index:
                 self.refer_index.calc_target_vector(target = target, prelude = prelude)
                 ref = self.refer_index.data[['quarter', target]]
-                df = fill_miss(ref, self.data.index, ifLabelingFilled = False)
+                df = fill_miss(ref, self.major.index, ifLabelingFilled = False)
                 result = ref[target]
             else:
-                result = self._calc(self.data, formula, prelude)
+                result = self._calc(self.major, formula, prelude)
 
         # print(self.code,target, result.shape)
-        self.data[target] = result
+        self.major[target] = result
 
     def _calc(self, data, formula, prelude):
         '''
@@ -263,7 +307,7 @@ class Ticks(object):
                     self.calc_target_vector(field)
 
                 def balance(df, field, new_field, n):
-                    df[new_field] = self.data[field].rolling(n).apply(
+                    df[new_field] = self.major[field].rolling(n).apply(
                         lambda li: (li[0] + li[-1]) / 2)
 
                 def ttm(df, field, new_field, n):
@@ -275,11 +319,7 @@ class Ticks(object):
                     'balance'  : balance,
                     'income'   : ttm,
                     'cash_flow': ttm}
-
-                std_duration = {
-                    'year'   : 5,
-                    'quarter': 2}
-                n = std_duration[prelude]
+                n = self.std_duration[prelude]
                 new_fields = []
                 for field in fields:
                     if field in new_fields:
@@ -314,22 +354,8 @@ class Ticks(object):
             if formula.finale != formula.finale:
                 result = eqt_series
             else:
-                reduce_methods = {
-                    'sum'              : sum,
-                    'sd'               : statistics.stdev,
-                    'mean'             : lambda list: sum(list) / len(list),
-                    'vix_yearly'       : lambda list: (sum([
-                        x ** 2 for x in list]) * 252 / len(list)) ** 0.5,
-                    'percent_geometric': lambda list: -1 + reduce(lambda accum, x: accum * (1 + x),
-                        list, 1) ** (1 / len(list)),
-                    'change'           : lambda list: list[-1] / list[0] - 1 if list[0] != 0 else 0,
-                    'inc'              : lambda list: list[-1] - list[0],
-                    'decline_avg'      : lambda list: reduce(
-                        lambda accum, x: (accum + x) * 2 ** (-1 / 3), list,
-                        0)}
                 n = int(formula.duration)
-                result = eqt_series.rolling(n).apply(reduce_methods[formula.finale])
-        # print(data[fields])
+                result = eqt_series.rolling(n).apply(Formula.reduce_methods[formula.finale])
         return result
 
     def __warn_zero_division(self, formula, eqt):
@@ -347,7 +373,7 @@ class Indexs(Ticks):
                 if col in tick:
                     tick.drop(col, axis = 1, inplace = True)
             tick.sort_values('date', inplace = True)
-            tick.date = tick.date.apply(std_date_str)
+            tick.date = tick.date.apply(date_str2std)
             if ifUpdate:
                 report = DMgr.update_csv('index', self.elements_quarter,
                     lambda start: self._fetch_element_report(start), index = 'quarter')
@@ -358,9 +384,6 @@ class Indexs(Ticks):
                 report = DMgr.read_csv('index', self.elements_quarter)
                 daily = DMgr.read_csv('index', self.elements_daily)
             tick = pd.merge(tick, daily, on = 'date', how = 'left')
-            # tick = brief_detail_merge(report, df, ifReduce2brief = False,
-            #     brief_col = 'quarter',
-            #     detail_col = 'date')
             return report, tick
 
         self.label = label
@@ -424,6 +447,17 @@ HS300 = Indexs(*Idx_dict['HS300'])
 # todo compare MG & MS cross the market
 
 class Stocks(Ticks):
+
+    @classmethod
+    def update_all_stock_targets(self):
+        def calc(code):
+            print(code + ' start')
+            stk = Stocks(code)
+            stk.calc_all_vector()
+            stk.save_targets()
+            print(code + ' saved')
+
+        DMgr.iter_stocks(calc, 'target_calc')
 
     def __init__(self, code):
         def __get_table():
