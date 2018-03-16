@@ -215,7 +215,7 @@ def stock_vector_test(code = hr, target = None):
     stk = Stocks(code)
     if target is None:
         df_res = stk.calc_all_vector()
-        # stk.save_targets()
+        stk.save_targets()
     else:
         stk.calc_target_vector(target = target)
     # print(datetime.now() - t0)
@@ -233,9 +233,10 @@ def error_reshow(name):
 
 
 def test():
-    error_reshow(error_file)
-    # stock_vector_test('000757')
 
+    # error_reshow(error_file)
+    stock_vector_test('000016')
+    # Stocks.update_all_stock_targets()
 
 # region numba
 li = [x for x in range(100)]

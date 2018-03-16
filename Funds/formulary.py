@@ -62,7 +62,7 @@ class Macro(object):
     #     merged = pd.merge(cap, sfs, on = 'year')
     #     merged['flow_cap_sfs'] = merged['circulating_market_cap'] / merged['social_finance_scale']
     #     DMgr.save_csv(merged, 'temp', 'cap_sfs')
-    #
+
     # @classmethod
     # def market_pe(cls):
     #     mp = DMgr.read_csv('temp', 'agg_profit')
@@ -224,8 +224,9 @@ class Ticks(object):
             self.major = pd.merge(self.major, self.targets, on = 'quarter', how = 'left')
 
     def save_targets(self):
-        DMgr.save_csv(self.targets, self.target_category, self.code)
-        DMgr.save_csv(self.tick, self.type, self.code)
+        if self.formulas is not None:
+            DMgr.save_csv(self.targets, self.target_category, self.code)
+            DMgr.save_csv(self.tick, self.type, self.code)
 
     def calc_all_vector(self):
         if self.formulas is None:
@@ -236,7 +237,7 @@ class Ticks(object):
             cols.append(i)
             if formula.source != TICK:
                 self.calc_target_vector(formula)
-        self.targets = self.major[cols]
+        self.targets = self.major[['quarter', *cols]]
         return self.targets
 
     def calc_target_vector(self, formula = None, target: str = None, prelude = np.nan):
@@ -346,6 +347,7 @@ class Ticks(object):
 
         else:
             eqt, fields = _prelude(data, formula, prelude)
+            # print(data[fields])
             if any([x in eqt for x in RESERVED_KEYWORDS]):
                 for field in fields:
                     eqt = eqt.replace(field, 'row.%s' % field)
@@ -463,7 +465,7 @@ class Stocks(Ticks):
                 stk.save_targets()
             # print(code + ' saved')
 
-        DMgr.iter_stocks(calc, 'target_calc', show_seq = True, limit = 10)
+        DMgr.iter_stocks(calc, 'target_calc', show_seq = True)
 
     def __init__(self, code):
         def __get_table():
@@ -481,9 +483,9 @@ class Stocks(Ticks):
                         report = df
                     else:
                         report = pd.merge(report, df, on = 'quarter',
-                            suffixes = ('', tb + DWash.DuplicatedFlag))
+                            suffixes = ('', DWash.DUPLICATE_SEPARATOR + tb + DWash.DUPLICATE_FLAG))
             if report.shape[0] > 0:
-                # DWash.column_regularI(report, 'financial_set')
+                DWash.column_selectI(report, 'financial_set')
                 report.index = report.quarter
                 report.sort_index(inplace = True)
 

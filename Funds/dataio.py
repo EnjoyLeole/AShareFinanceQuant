@@ -167,7 +167,8 @@ DMgr = _DataManager()
 class _DataWasher(metaclass = SingletonMeta):
     COLUMN_UPDATE = True
     WARNING_LEVEL = 0.5
-    DuplicatedFlag = '*2'
+    DUPLICATE_SEPARATOR = '~'
+    DUPLICATE_FLAG = '*2'
 
     def __init__(self):
         self.mapper = get_lib('mapper')
@@ -233,41 +234,45 @@ class _DataWasher(metaclass = SingletonMeta):
                 duplicate[field] = flag = 0 if field not in duplicate else duplicate[field] + 1
                 if flag > 0 and col != field:
                     print('Duplicated column %s: %s -> %s' % (flag, col, field))
-                    matches[col] += '~%s%s' % (flag, self.DuplicatedFlag)
+                    matches[col] += '%s%s%s' % (self.DUPLICATE_SEPARATOR, flag, self.DUPLICATE_FLAG)
             if category != '':
                 self.matched[category] = matches
                 obj2file(self.match_path, self.matched)
         return matches
 
-    def _column_select(self, df, matches):
+    def column_selectI(self, df, matches):
         rename = lambda x: df.rename(columns = x, inplace = True)
 
         def __compareI(origin, dual_key):
+            def __chose_origin():
+                rename({
+                    dual_key: dual_key + 'Done'})
+
+            def __chose_dual():
+                rename({
+                    origin: origin + 'Done'})
+                rename({
+                    dual_key: origin})
+
             dual = df[dual_key]
             if isinstance(dual, pd.DataFrame):
                 raise Exception('%s has multiple columns, Should handle before!' % dual_key)
 
             self._numericI(df, [origin, dual_key])
-            orgSum = df[origin].sum()
-            dualSum = df[dual_key].sum()
+            orgSum = (df[origin] != 0).sum()
+            dualSum = (df[dual_key] != 0).sum()
             diff = orgSum - dualSum
             maxSum = max(orgSum, dualSum)
             diff_rate = diff / maxSum if maxSum > 0 else 0
 
             if abs(diff_rate) < 0.001 or dualSum == 0:
-                rename({
-                    dual_key: dual_key + 'Done'})
+                __chose_origin()
             elif orgSum == 0 and dualSum != 0:
-                rename({
-                    origin: origin + 'Done'})
-                rename({
-                    dual_key: origin})
+                __chose_dual()
             else:
                 def validate(series):
                     if series[origin] != series[dual_key] and series[origin] != 0 and series[
                         dual_key] != 0:
-                        # print('Inconsistent of value between %s(%s) and %s(%s)' % (
-                        #     origin, series[origin], dual_key, series[dual_key]))
                         return 1
                     return 0
 
@@ -275,31 +280,25 @@ class _DataWasher(metaclass = SingletonMeta):
                 if check / df.shape[0] > self.WARNING_LEVEL:
                     print('Inconsistent for %s bigger than %s with %s in %s / %s records' % (
                         origin, dual_key, diff_rate, check, df.shape[0]))
-
-                if diff < 0:
-                    rename({
-                        origin: origin + 'Done'})
-                    rename({
-                        dual_key: origin})  # print('Prefer %s than %s / diff:%s' % (  #  #  #  #  #  dual_key,  #  origin, diff))
-                else:
-                    rename({
-                        dual_key: dual_key + 'Done'})
+                __chose_dual() if diff < 0 else __chose_origin()
 
         keys = {}
-        cols_id = [[x.split('~')[0], x] for x in df.columns]
+        cols_id = [[x.split(self.DUPLICATE_SEPARATOR)[0], x] for x in df.columns]
         for id, col in cols_id:
             if id not in keys:
                 keys[id] = [0, [col]]
             else:
-                keys[id] = [keys[id][0] + 1, keys[id].append(col)]
-
-        for id in keys:
-            if keys[id][0] > 1:
-                for field in keys[id][1]:
-                    if id == 'date' and field != 'date':
-                        df.drop(field, inplace = True)
-                    elif id != field:
-                        __compareI(id, field)
+                keys[id][0] += 1
+                keys[id][1].append(col)
+        dup_list = [[key, *keys[key]] for key in keys if keys[key][0] > 0]
+        for id, _, fields in dup_list:
+            # if keys[id][0] > 1:
+            for field in fields:
+                if id == 'date' and field != 'date':
+                    if field in df:
+                        df.drop(field, axis = 1, inplace = True)
+                elif id != field:
+                    __compareI(id, field)
 
     def column_regularI(self, df: pd.DataFrame, category = ''):
         matches = self._column_match(df, category)
@@ -307,7 +306,7 @@ class _DataWasher(metaclass = SingletonMeta):
         df.rename(columns = matches, inplace = True)
 
         # print([col for col in df.columns.values if 'long_d' in col])
-        self._column_select(df, matches)
+        self.column_selectI(df, matches)
 
     # endregion
 
@@ -395,9 +394,10 @@ class _DataWasher(metaclass = SingletonMeta):
                 cur = row[column]
                 last = row[last_col]
                 res = cur if row['quart'] == '1' else cur - last
-                return res if cur > 0 else last
+                return res if cur > 0 else last if last > 0 else np.nan
 
             ttms = df.apply(ttm2, axis = 1)
+            ttms.fillna(method = 'pad', inplace = True)
         else:
             last = [0, 0, 0, 0, 0]
 
