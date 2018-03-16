@@ -202,19 +202,15 @@ def code_re():
     df.to_csv('D:/code.csv', encoding = GBK)
 
 
-def error_reshow(name):
-    list = file2obj(get_error_path(name))
-    for code in list:
-        N163.override_finance(code[1])
-    # codes = ['000003']
-
-    # Updater._update_stock_hist(codes[0])
-
-
 # endregion
 
 
-def stock_vector_test(target = None, code = hr):
+def index_target_test(code = '399300'):
+    id = Indexs('hs300', code)
+    id.calc_all_vector()
+
+
+def stock_vector_test(code = hr, target = None):
     # t0 = datetime.now()
     stk = Stocks(code)
     if target is None:
@@ -225,20 +221,23 @@ def stock_vector_test(target = None, code = hr):
     # print(datetime.now() - t0)
 
 
-def index_target_test(code = '399300'):
-    id = Indexs('hs300', code)
-    id.calc_all_vector()
+error_file = 'error_reshow.txt'
 
 
-def stockgroup_test():
-    for code in DMgr.code_list.head(10):
-        stock_vector_test(code = code)
+def error_reshow(name):
+    list = file2obj(get_error_path(name))
+    list = [x[1] for x in list]
+    res = loop(lambda code: stock_vector_test(code = code), list, 1, flag = 'error_reshow')
+    obj2file(get_error_path(error_file), res)
+    print(res)
 
 
 def test():
-    stock_vector_test()
+    error_reshow(error_file)
+    # stock_vector_test('000757')
 
 
+# region numba
 li = [x for x in range(100)]
 li = numpy.array(li)
 
@@ -254,10 +253,12 @@ def numba(arr = li):
     # print(val)
 
 
+# endregion
+
 if __name__ == '__main__':
     # test()
     print(timeit(test, number = 1))
-    times=100000
+    times = 100000
     # pNum('python', timeit(python,number=times))
     # numba()
     # pNum('numba', timeit(numba,number=times))

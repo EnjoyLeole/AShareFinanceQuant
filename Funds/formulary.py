@@ -168,24 +168,25 @@ Formula = _FinancialFormula()
 
 
 class Ticks(object):
-    IfRenew = True
+    If_Renew = True
 
     std_duration = {
         'year'   : 5,
         'quarter': 2}
 
-    def __init__(self, code, filter, table_getter: callable, type: str, refer_index = None):
-        self.formulas = Formula.table[Formula.table.target.apply(filter)]
+    def __init__(self, code, formula_selector, table_getter: callable, security_type: str,
+                 refer_index = None):
+        self.formulas = Formula.table[Formula.table.target.apply(formula_selector)]
         self.refer_index = refer_index
 
         self.code = code
-        self.type = type
+        self.type = security_type
 
         def raw_data_fetch():
             report, tick = table_getter()
             if report is None or report.shape[0] == 0 or tick is None:
                 self.formulas = None
-                warnings.warn('%s %s dont have data!' % (type, code))
+                warnings.warn('%s %s dont have data!' % (security_type, code))
                 return None, None
             tick.date = tick.date.apply(date_str2std)
             tick.index = tick.date
@@ -206,7 +207,7 @@ class Ticks(object):
 
         def target_saved_fetch():
             targets = DMgr.read_csv(self.target_category, code)
-            if targets is None or self.IfRenew:
+            if targets is None or self.If_Renew:
                 targets = pd.DataFrame(index = self.report.index)
                 targets['quarter'] = targets.index
             else:
@@ -215,7 +216,7 @@ class Ticks(object):
 
         self.targets = target_saved_fetch()
 
-        if self.IfRenew:
+        if self.If_Renew:
             for idx, formula in Formula.table[Formula.table.source == TICK].iterrows():
                 if idx in self.tick:
                     self.tick = self.tick.drop(idx, axis = 1)
@@ -348,7 +349,11 @@ class Ticks(object):
             if any([x in eqt for x in RESERVED_KEYWORDS]):
                 for field in fields:
                     eqt = eqt.replace(field, 'row.%s' % field)
-                eqt_series = data.apply(lambda row: eval(eqt), axis = 1)
+                if target == 'RSIZE':
+                    func = lambda row: eval(eqt) if row.market_cap > 0 else 0
+                else:
+                    func = lambda row: eval(eqt)
+                eqt_series = data.apply(func, axis = 1)
             else:
                 eqt_series = data.eval(eqt, parser = 'pandas')
             if formula.finale != formula.finale:
@@ -400,7 +405,7 @@ class Indexs(Ticks):
 
     def _fetch_element_report(self, start_date):
         allFina = DMgr.category_concat(self.code_list, 'income', ['net_profit'], start_date,
-            showSeq = True)
+            show_seq = True)
         if allFina.shape[0] == 0:
             return None
         allFina['quarter'] = allFina['date'].apply(to_quarter)
@@ -412,7 +417,7 @@ class Indexs(Ticks):
 
     def _fetch_element_tick(self, start_date):
         allTicks = DMgr.category_concat(self.code_list, 'stock',
-            ['market_cap', 'circulating_market_cap'], start_date, showSeq = True)
+            ['market_cap', 'circulating_market_cap'], start_date, show_seq = True)
         if allTicks.shape[0] == 0:
             return None
         allTicks = allTicks.groupby('date').agg({
@@ -451,21 +456,26 @@ class Stocks(Ticks):
     @classmethod
     def update_all_stock_targets(self):
         def calc(code):
-            print(code + ' start')
+            # print(code + ' start')
             stk = Stocks(code)
-            stk.calc_all_vector()
-            stk.save_targets()
-            print(code + ' saved')
+            res = stk.calc_all_vector()
+            if res is not None:
+                stk.save_targets()
+            # print(code + ' saved')
 
-        DMgr.iter_stocks(calc, 'target_calc')
+        DMgr.iter_stocks(calc, 'target_calc', show_seq = True, limit = 10)
 
     def __init__(self, code):
         def __get_table():
             report = None
             for tb in ['balance', 'cash_flow', 'income']:
-                df = DMgr.read_csv(tb, self.code, ifRegular = False)
+                df = DMgr.read_csv(tb, self.code, if_regular = False)
                 if df is not None:
                     df['quarter'] = df['date'].apply(to_quarter)
+                    dup = df[df['quarter'].duplicated()]
+                    if dup.shape[0] > 0:
+                        print(self.code, tb, 'has duplicate index! Dropped!')
+                        df.drop_duplicates('quarter', inplace = True)
                     df = df[df.quarter != None]
                     if report is None:
                         report = df

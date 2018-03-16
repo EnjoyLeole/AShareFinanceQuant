@@ -1,9 +1,10 @@
 from Meta import *
 from Basic.Util import *
 from Basic.IO import *
-import time, os, re
+import os, re
 import numpy as np
 import pandas as pd
+
 from urllib3 import PoolManager
 
 OLDEST_DATE = '1988-01-01'
@@ -22,8 +23,7 @@ DATA_FOLDERS = {
     'category'    : 'category'}
 TICK = 'ticks_daily'
 REPORT = 'financial_report_quarterly'
-DUPLICATE_FLAG = '_d'
-FORCE_FILLED = 'force_filled'
+
 TTM_SUFFIX = '_ttm'
 
 
@@ -32,8 +32,8 @@ def get_url(url, encoding = ''):
         encoding = GBK
     pm = PoolManager()
     res = pm.request('get', url)
-    dict = res.data.decode(encoding)
-    return dict
+    res_dict = res.data.decode(encoding)
+    return res_dict
 
 
 def code2symbol(code):
@@ -41,83 +41,6 @@ def code2symbol(code):
         return code
     tail = 'SH' if code[0] == '6' else 'SZ'
     return code + '.' + tail
-
-
-def remove_duplicateI(df):
-    dups = [x for x in df if x.endswith(DUPLICATE_FLAG)]
-    df.drop(dups, axis = 1, inplace = True)
-
-
-def fill_miss(df, refer_idxs, brief_col = 'quarter', ifLabelingFilled = True):
-    # brief_col = 'index' if brief_col is None else brief_col
-    missing = [x for x in refer_idxs if x not in df[brief_col].values]
-    missing = list(set(missing))
-    if ifLabelingFilled:
-        df[FORCE_FILLED] = False
-    for qt in missing:
-        # if qt is None:
-        #     continue
-        # cands = df[df[brief_col] > qt][brief_col]
-        # if cands.shape[0] > 0:
-        #     chosen = cands[0]
-        # else:
-        #     chosen = df[brief_col][-1]
-        # df.loc[qt] =None
-
-        df.loc[qt, brief_col] = qt
-        if ifLabelingFilled:
-            df.loc[qt, FORCE_FILLED] = True
-    df = df.fillna(method = 'pad')
-    return df
-
-
-def reduce2brief(df, brief_col = 'quarter', detail_col = 'date'):
-    if brief_col not in df:
-        detail2brief_func = INTERVAL_TRANSFER[(detail_col, brief_col)]
-        df[brief_col] = df[detail_col].apply(detail2brief_func)
-    group = df.groupby(brief_col).agg({
-        detail_col: 'max'})[detail_col].tolist()
-    df.index = df[detail_col]
-    # flag = df[detail_col].apply(lambda x: True if x in group.values else False)
-    df_reduced = df.ix[group].copy()
-    df_reduced.index = df_reduced[brief_col]
-    return df_reduced
-
-
-def brief_detail_merge(brief, detail, ifReduce2brief = False, brief_col = 'quarter',
-                       detail_col = 'date'):
-    '''将周期不同的两张表做合并，在两表的index不完全重合时，会使用相邻项进行填充
-    :param ifReduce2brief
-        True:以汇总表为基础合并，明细表中取detail_col最大项
-        False：以明细表为基础合并，汇总表分散对应至明细表中各个brief_col的相同项'''
-    detail2brief_func = INTERVAL_TRANSFER[(detail_col, brief_col)]
-    if brief_col not in detail:
-        detail[brief_col] = detail[detail_col].apply(detail2brief_func)
-    if brief_col not in brief:
-        brief[brief_col] = brief[detail_col].apply(detail2brief_func)
-    brief.sort_values(brief_col, inplace = True)
-    brief.index = brief[brief_col]
-    brief = brief[brief[brief_col] > '']
-
-    if ifReduce2brief:
-        df_reduced = reduce2brief(detail, brief_col, detail_col)
-        if df_reduced.shape[0] < brief.shape[0]:
-            df_reduced = fill_miss(df_reduced, brief.index, brief_col)
-        detail = df_reduced
-        method = 'left'
-        # valid = '1:m'
-    else:
-        brief = fill_miss(brief, detail[brief_col], brief_col)
-        method = 'right'
-        # valid = '1:m'
-    df = pd.merge(brief, detail, on = brief_col, how = method, suffixes = ['', DUPLICATE_FLAG])
-    df.sort_values([brief_col, detail_col], inplace = True)
-    # cols=sorted(df.columns.values)
-    # pco=sorted(set(cols))
-    # print(cols)
-    # print(pco)
-    # print(brief.shape, detail.shape, df.shape)
-    return df
 
 
 class _DataManager(metaclass = SingletonMeta):
@@ -140,9 +63,9 @@ class _DataManager(metaclass = SingletonMeta):
             df = DMgr.read_csv('balance', code)
             if df is not None and df.shape[0] > 0:
                 df['quarter'] = df.date.apply(to_quarter)
-                curQuarter = to_quarter()
+                cur_quarter = to_quarter()
                 for i in range(4):
-                    qt = quarter_add(curQuarter, -i - 1)
+                    qt = quarter_add(cur_quarter, -i - 1)
                     if (df.quarter == qt).any():
                         return False
             return True
@@ -160,7 +83,7 @@ class _DataManager(metaclass = SingletonMeta):
         folder = STOCK_ROOT + DATA_FOLDERS[category] + '\\'
         return folder + '%s.csv' % code
 
-    def read_csv(self, category, code, ifRegular = True):
+    def read_csv(self, category, code, if_regular = True):
         path = self.__csv_path(category, code)
         if not os.path.exists(path):
             return None
@@ -211,38 +134,15 @@ class _DataManager(metaclass = SingletonMeta):
             DMgr.save_csv(new, category, code)
             return new
 
-    def loop(self, func, para_list, flag = '', times = 1, delay = 0, showSeq = False, limit = -1):
-        fails = []
-        count = 0
-        for para in para_list:
-            if count > limit and limit > 0:  break
-            if showSeq:
-                print(count, flag, para)
-            for i in range(times):
-                try:
-                    func(para)
-                except TimeoutError as e:
-                    if i == times - 1:
-                        print(e)
-                        fails.append([flag, para])
-                    if delay > 0:
-                        time.sleep(delay)
-                except Exception as e:
-                    print(e)
-                    fails.append([flag, para])
-            count += 1
+    def iter_stocks(self, func, flag, show_seq = False, num_process = 4, limit = -1):
+        loop(func, self.code_list, num_process = num_process, flag = flag, show_seq = show_seq,
+            limit = limit)
 
-        if len(fails) > 0:
-            path = get_error_path(flag + '.txt')
-            obj2file(path, fails)  # return fails
+    def iter_index(self, func, flag, show_seq = False, num_process = 4, limit = -1):
+        loop(func, self.idx_list, num_process = num_process, flag = flag, show_seq = show_seq,
+            limit = limit)
 
-    def iter_stocks(self, func, flag, limit = -1):
-        self.loop(func, self.code_list, flag, limit = limit)
-
-    def iter_index(self, func, flag, limit = -1):
-        self.loop(func, self.idx_list, flag, limit = limit)
-
-    def category_concat(self, code_list, category, columns, start_date, showSeq = False):
+    def category_concat(self, code_list, category, columns, start_date, show_seq = False):
         tid = category + '_concat' + uid()
         setattr(self, tid, pd.DataFrame())
 
@@ -256,7 +156,7 @@ class _DataManager(metaclass = SingletonMeta):
                     temp = pd.concat([temp, df])
                     setattr(self, tid, temp)
 
-        self.loop(_concat_code, code_list, tid, showSeq = showSeq)
+        loop(_concat_code, code_list, tid, show_seq = show_seq)
 
         return getattr(self, tid)
 
@@ -282,9 +182,14 @@ class _DataWasher(metaclass = SingletonMeta):
                 f.write('{}')
         self.matched = file2obj(self.match_path)
 
+    def raw_regularI(self, df: pd.DataFrame, category = ''):
+        self.replaceI(df)
+        self.value_scale_by_column_name(df)
+        self.column_regularI(df, category)
+
     # region column name regular
 
-    def _simplify_name(cls, name):
+    def _simplify_name(self, name):
         swap_pair = [['所有者', '股东'], ['的', ''], ['所', '']]
         for pair in swap_pair:
             name = name.replace(*pair)
@@ -406,11 +311,6 @@ class _DataWasher(metaclass = SingletonMeta):
 
     # endregion
 
-    def raw_regularI(self, df: pd.DataFrame, category = ''):
-        self.replaceI(df)
-        self.value_scale_by_column_name(df)
-        self.column_regularI(df, category)
-
     # region one time active for files
 
     def simplify_dirs(cls, category):
@@ -486,7 +386,7 @@ class _DataWasher(metaclass = SingletonMeta):
 
         df = df.sort_values('quarter')
         if n == 2:
-            col = df[column].fillna(method = 'pad')
+            col = df[column].fillna(method = 'pad')  # todo better fill
             df['quart'] = df['quarter'].apply(lambda x: x.split(QUARTER_SEPARATOR)[1])
             last_col = 'last' + column
             df[last_col] = col.shift(1)
@@ -527,6 +427,7 @@ class _DataWasher(metaclass = SingletonMeta):
                 return vals[1] - vals[0] if vals[1] > 0 else vals[0]
         else:
             last = [0, 0, 0, 0, 0]
+            ttm = 0
             for key in dict:
                 val = dict[key]
                 year, qt = key.split(QUARTER_SEPARATOR)
@@ -536,10 +437,10 @@ class _DataWasher(metaclass = SingletonMeta):
             return ttm
 
     def get_changeI(self, df: pd.DataFrame):
-        preClose = df['close'].values
-        preClose = np.insert(preClose, 0, np.nan)
-        preClose = preClose[0:len(preClose) - 1]
-        df['pre_close'] = preClose
+        pre_close = df['close'].values
+        pre_close = np.insert(pre_close, 0, np.nan)
+        pre_close = pre_close[0:len(pre_close) - 1]
+        df['pre_close'] = pre_close
         df['change_amount'] = df['close'] - df['pre_close']
 
         if 'change' in df:
@@ -550,8 +451,6 @@ class _DataWasher(metaclass = SingletonMeta):
 
         pr = 'derc_close' if 'derc_close' in df else 'close'
         df['change_rate'] = df[pr].rolling(2).apply(ratio)
-
-        # print(df.loc[:,['close','pre_close','change_amount']])
 
 
 DWash = _DataWasher()
