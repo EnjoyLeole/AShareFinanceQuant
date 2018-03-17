@@ -9,6 +9,7 @@
 */StockData/*
 matched.json
 error_reshow.txt
+
 */Old/*
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
@@ -264,3 +265,7 @@ __pycache__/
 *.pyc
 Stock/Old/
 Meta/error_reshow.txt
+Quant.pyperf
+Quant.pyproj
+Quant.sln
+Meta/formula_backup.csv

@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta, date
 
-
 DATE_SEPARATOR = '-'
 QUARTER_SEPARATOR = 'Q'
 
@@ -168,6 +167,16 @@ def quarter_add(quarter, i):
         q = 4
         year -= 1
     return '%s%s%s' % (year, QUARTER_SEPARATOR, q)
+
+
+def quarter_range(start_year=1988, end_year=None):
+    if end_year is None:
+        end_year=today().year
+    list = []
+    for year in range(start_year, end_year+1):
+        for quarter in range(1, 5):
+            list.append('%s%s%s' % (year, QUARTER_SEPARATOR, quarter))
+    return list
 
 
 class Quarter(object):

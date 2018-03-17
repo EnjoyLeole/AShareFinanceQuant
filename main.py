@@ -169,8 +169,8 @@ def reg_resolve_test(formula):
 def quarter_date_merge_test():
     quart = DMgr.read_csv('balance', code)
     dat = DMgr.read_csv('stock', code)
-    d1 = brief_detail_merge(quart, dat, ifReduce2brief = True)
-    d2 = brief_detail_merge(quart, dat, ifReduce2brief = False)
+    # d1 = brief_detail_merge(quart, dat, ifReduce2brief = True)
+    # d2 = brief_detail_merge(quart, dat, ifReduce2brief = False)
     # qddate=quart[['date','quarter']]
     # dq=d1.loc[:,['date','quarter']]
 
@@ -204,6 +204,11 @@ def code_re():
 
 # endregion
 
+def df_test():
+    df = DMgr.read_csv('target', 'PE')
+    result = df.eval('log10(close)')
+    print(result)
+
 
 def index_target_test(code = '399300'):
     id = Indexs('hs300', code)
@@ -233,10 +238,13 @@ def error_reshow(name):
 
 
 def test():
-
+    Cluster.stock2target()
+    # df_test()
     # error_reshow(error_file)
-    stock_vector_test('000016')
+    # stock_vector_test('000016')
     # Stocks.update_all_stock_targets()
+    # print(quarter_range())
+
 
 # region numba
 li = [x for x in range(100)]
@@ -257,9 +265,9 @@ def numba(arr = li):
 # endregion
 
 if __name__ == '__main__':
-    # test()
+    print('start')
     print(timeit(test, number = 1))
     times = 100000
-    # pNum('python', timeit(python,number=times))
-    # numba()
-    # pNum('numba', timeit(numba,number=times))
+# pNum('python', timeit(python,number=times))
+# numba()
+# pNum('numba', timeit(numba,number=times))

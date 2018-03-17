@@ -20,7 +20,8 @@ DATA_FOLDERS = {
     'temp'        : 'temp',
     'stock_target': 'target_stock',
     'index_target': 'target_index',
-    'category'    : 'category'}
+    'category'    : 'category',
+    'target'      : 'cluster_target'}
 TICK = 'ticks_daily'
 REPORT = 'financial_report_quarterly'
 
@@ -240,7 +241,7 @@ class _DataWasher(metaclass = SingletonMeta):
                 obj2file(self.match_path, self.matched)
         return matches
 
-    def column_selectI(self, df, matches):
+    def column_selectI(self, df):
         rename = lambda x: df.rename(columns = x, inplace = True)
 
         def __compareI(origin, dual_key):
@@ -306,7 +307,7 @@ class _DataWasher(metaclass = SingletonMeta):
         df.rename(columns = matches, inplace = True)
 
         # print([col for col in df.columns.values if 'long_d' in col])
-        self.column_selectI(df, matches)
+        self.column_selectI(df)
 
     # endregion
 

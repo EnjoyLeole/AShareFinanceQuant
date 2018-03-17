@@ -23,6 +23,15 @@ def fill_miss(df, refer_idxs, brief_col = 'quarter', ifLabelingFilled = True):
     return df
 
 
+def truncate_period(df, truncate_val, truncate_col = 'quarter'):
+    df.sort_values(truncate_col, inplace = True)
+    last = df.iloc[-1]
+    if last[truncate_col] != truncate_val:
+        df.loc[truncate_val, :] = last
+        df.loc[truncate_val, truncate_col] = truncate_val
+    return df
+
+
 def reduce2brief(df, brief_col = 'quarter', detail_col = 'date'):
     if brief_col not in df:
         detail2brief_func = INTERVAL_TRANSFER[(detail_col, brief_col)]

@@ -115,6 +115,7 @@ class _FinancialFormula(metaclass = SingletonMeta):
         # get table-field relation pairs for further use, table of *_indicator excluded
         self._table_fields = {row.field: row.table for i, row in DWash.mapper.iterrows() if
                               '_in' not in row.table}
+        self.key_targets = []
 
         def _organise_table():
             table = get_lib('formula')
@@ -142,6 +143,8 @@ class _FinancialFormula(metaclass = SingletonMeta):
                     else:
                         source = REPORT
                 table.ix[target, 'source'] = source
+                if formula.indicia == 'key':
+                    self.key_targets.append(formula.target)
 
             return table, factor_dict
 
@@ -191,18 +194,22 @@ class Ticks(object):
             tick.date = tick.date.apply(date_str2std)
             tick.index = tick.date
             tick['quarter'] = tick.date.apply(to_quarter)
-            # self.lastQuarter = self.report['quarter'].iloc[-1]
-            self.lastQuarter = tick.iloc[-1].quarter
-            if self.lastQuarter != report.iloc[-1].quarter:
-                report = fill_miss(report, [self.lastQuarter], 'quarter')
+
+            # self.lastQuarter = tick.iloc[-1].quarter
+            # if self.lastQuarter != report.iloc[-1].quarter:
+            #     report = fill_miss(report, [self.lastQuarter], 'quarter')
             return report, tick
 
         self.report, self.tick = raw_data_fetch()
+
         if self.report is None: return
+        self.lastQuarter = self.report['quarter'].iloc[-1]
 
         self.target_category = self.type + '_target'
 
-        self.major = brief_detail_merge(self.report, self.tick, ifReduce2brief = True)
+        reduced = reduce2brief(self.tick)
+        reduced = truncate_period(reduced, self.lastQuarter)
+        self.major = pd.merge(self.report, reduced, on = 'quarter', how = 'left')
         self.major.index = self.major.quarter
 
         def target_saved_fetch():
@@ -250,7 +257,7 @@ class Ticks(object):
         prelude = formula.prelude if prelude != prelude else prelude
 
         if formula.source == TICK:
-            # for daily tick, insert into self.tick first, then reduce 2 self.data
+            # for daily tick, insert into self.tick first, then reduce to self.data
             if target not in self.formulas.index:
                 self.refer_index.calc_target_vector(target = target, prelude = prelude)
                 tick_result = self.refer_index.tick[target]
@@ -264,6 +271,7 @@ class Ticks(object):
                     target: tick_result.values})
                 df = reduce2brief(df)
                 df = fill_miss(df, self.major.index)
+                df = truncate_period(df, self.major.index[-1])
                 result = df[target]
             self.tick[target] = tick_result
 
@@ -348,20 +356,21 @@ class Ticks(object):
         else:
             eqt, fields = _prelude(data, formula, prelude)
             # print(data[fields])
-            if any([x in eqt for x in RESERVED_KEYWORDS]):
-                for field in fields:
-                    eqt = eqt.replace(field, 'row.%s' % field)
-                if target == 'RSIZE':
-                    func = lambda row: eval(eqt) if row.market_cap > 0 else 0
-                else:
-                    func = lambda row: eval(eqt)
-                eqt_series = data.apply(func, axis = 1)
-            else:
-                eqt_series = data.eval(eqt, parser = 'pandas')
+            # if any([x in eqt for x in RESERVED_KEYWORDS]):
+            #     for field in fields:
+            #         eqt = eqt.replace(field, 'row.%s' % field)
+            #     if target == 'RSIZE':
+            #         func = lambda row: eval(eqt) if row.market_cap > 0 else 0
+            #     else:
+            #         func = lambda row: eval(eqt)
+            #     eqt_series = data.apply(func, axis = 1)
+            # else:
+            # print(target,eqt)
+            eqt_series = data.eval(eqt, parser = 'pandas')
             if formula.finale != formula.finale:
                 result = eqt_series
             else:
-                n = int(formula.duration)
+                n = int(formula.quarter) if formula.source != TICK else int(formula.quarter * 90)
                 result = eqt_series.rolling(n).apply(Formula.reduce_methods[formula.finale])
         return result
 
@@ -485,7 +494,7 @@ class Stocks(Ticks):
                         report = pd.merge(report, df, on = 'quarter',
                             suffixes = ('', DWash.DUPLICATE_SEPARATOR + tb + DWash.DUPLICATE_FLAG))
             if report.shape[0] > 0:
-                DWash.column_selectI(report, 'financial_set')
+                DWash.column_selectI(report)
                 report.index = report.quarter
                 report.sort_index(inplace = True)
 
