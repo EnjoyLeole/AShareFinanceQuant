@@ -1,2 +1,2 @@
 from .dataio import code2symbol
-from .formulary import WebUpdater, Indexs, Stocks
+from .formulary import Indexs, Stocks

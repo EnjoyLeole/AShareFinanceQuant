@@ -9,8 +9,7 @@
 */StockData/*
 matched.json
 error_reshow.txt
-
-*/Old/*
+/Old/*
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
@@ -269,3 +268,4 @@ Quant.pyperf
 Quant.pyproj
 Quant.sln
 Meta/formula_backup.csv
+Old/formula_backup.csv

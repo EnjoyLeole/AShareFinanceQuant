@@ -33,7 +33,7 @@ eqt = '21361470000.0+107340000.0+7131370000.0+976342054116.0/21361470000.0+0.0+0
 
 # region web
 def all_update():
-    WebUpdater.all_idx()
+    Updater.all_idx()
 
 
 def idx_hit():
@@ -46,7 +46,7 @@ def N163_test():
 
 
 def derc_test():
-    df = WebUpdater._update_stock_derc(bcode)
+    df = Updater._update_stock_derc(bcode)
     # df=N163.fetch_derc(bcode, 2013)
     print(df)
 
@@ -243,15 +243,9 @@ def error_reshow():
 
 
 def test():
-    # Cluster.stock2target(False)
-    Cluster.stat('PE')
     # df_test()
-
+    Updater.all_cluster_target_stat()
     # error_reshow()
-    # Stocks.update_all_stock_targets()
-    # WebUpdater.all_stock()
-    # WebUpdater._update_stock_hist('000002')
-    # N163.fetch_derc('000002', 2015)
 
 
 # region numba

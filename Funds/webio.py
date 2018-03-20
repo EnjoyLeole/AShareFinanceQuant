@@ -4,42 +4,6 @@ from .dataio import *
 import json
 
 
-class _WebUpdater(metaclass = SingletonMeta):
-    def everything(self):
-        self.all_idx()
-        self.all_stock()
-        self.all_finance()
-        self.all_macro()
-
-    def all_macro(cls):
-        Tuget.override_macros()
-        Tuget.override_margins()
-        Tuget.override_shibor()
-        Tuget.override_category()
-
-    def all_finance(cls):
-        DMgr.iter_stocks(N163.override_finance, 'financial_override', num_process = 12)
-
-    def all_stock(self):
-        DMgr.iter_stocks(self._update_stock_hist, 'stock_update', num_process = 12)
-
-    def all_idx(self):
-        DMgr.iter_index(self._update_idx_hist, 'index_update', num_process = 12)
-
-    def _update_idx_hist(cls, code):
-        category = 'index'
-        DMgr.update_csv(category, code,
-            lambda start_year: N163.fetch_hist(code, start_year, index = True))
-
-    def _update_stock_hist(cls, code):
-        category = 'stock'
-        DMgr.update_csv(category, code,
-            lambda start_year: N163.fetch_stock_combined_his(code, start_year))
-
-
-WebUpdater = _WebUpdater()
-
-
 class N163(object):
     # 0 for index   1 for stock
     url_his = "http://quotes.money.163.com/service/chddata.html?code=%s%s&start=%s"
@@ -53,6 +17,17 @@ class N163(object):
     period = ['day', 'week', 'month']
 
     # "dbfx": "https://quotes.money.163.com/f10/dbfx_%s.html"}
+    @classmethod
+    def update_idx_hist(cls, code):
+        category = 'index'
+        DMgr.update_csv(category, code,
+            lambda start_year: N163.fetch_hist(code, start_year, index = True))
+
+    @classmethod
+    def update_stock_hist(cls, code):
+        category = 'stock'
+        DMgr.update_csv(category, code,
+            lambda start_year: N163.fetch_stock_combined_his(code, start_year))
 
     @classmethod
     def override_finance(cls, code):
@@ -135,7 +110,7 @@ class N163(object):
         else:
             end = ''
 
-        start_str = date2str(start).replace(DATE_SEPARATOR,'')
+        start_str = date2str(start).replace(DATE_SEPARATOR, '')
         end_str = date2str(end)
         i = (0 if code[0] == '0' else 1) if index else (0 if code[0] == '6' else 1)
         url = cls.url_his % (i, code, start_str) + end

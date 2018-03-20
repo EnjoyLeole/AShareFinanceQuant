@@ -10,19 +10,20 @@ __file_name = {
 lib = {}
 
 dir = os.path.dirname(os.path.abspath(__file__))
+DATA_ROOT = dir + '\\StockData\\'
 
 
 def get_error_path(name):
-    return dir + '\\' + name
-
-
-def get_error_list(name):
-    path = get_error_path(name+'.txt')
-    return file2obj(path)
+    return dir + '\\%s.txt' % name
 
 
 def get_lib_path(key):
     return dir + '\\' + __file_name[key]
+
+
+def get_error_list(name):
+    path = get_error_path(name)
+    return file2obj(path)
 
 
 def get_lib(key):

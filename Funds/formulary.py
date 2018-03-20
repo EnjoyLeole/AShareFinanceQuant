@@ -468,21 +468,7 @@ HS300 = Indexs(*Idx_dict['HS300'])
 
 class Stocks(Ticks):
 
-    @classmethod
-    def update_all_stock_targets(self):
-        def calc(code):
-            if os.path.getmtime(DMgr.csv_path('stock_target', code)) >= datetime(2018, 3, 18, 23,
-                    0).timestamp():
-                print('%s jumped' % code)
-                return
-            # print(code + ' start')
-            stk = Stocks(code)
-            res = stk.calc_all_vector()
-            if res is not None:
-                stk.save_targets()
-            # print(code + ' saved')
 
-        DMgr.iter_stocks(calc, 'target_calc', show_seq = True, num_process = 7)
 
     def __init__(self, code):
         def __get_table():

@@ -3,11 +3,10 @@ from Basic import *
 import os, re
 import numpy as np
 import pandas as pd
-
 from urllib3 import PoolManager
 
 OLDEST_DATE = '1988-01-01'
-STOCK_ROOT = 'D:\\StockData\\'
+
 DATA_FOLDERS = {
     'indicator'   : 'financial_indicator',
     'balance'     : 'financial_balance',
@@ -27,6 +26,8 @@ REPORT = 'financial_report_quarterly'
 TTM_SUFFIX = '_ttm'
 
 
+
+
 def get_url(url, encoding = ''):
     if encoding == '':
         encoding = GBK
@@ -44,13 +45,15 @@ def code2symbol(code):
 
 
 class _DataManager(metaclass = SingletonMeta):
-    cl_path = STOCK_ROOT + 'code_list.csv'
+    cl_path = DATA_ROOT + 'code_list.csv'
 
     def __init__(self):
+        set_failure_path(get_error_path)
+
         self.code_table = pd.read_csv(self.cl_path, encoding = GBK)
         self.active_table = self.code_table[self.code_table.stop == False]
         self.code_list = self.code_table['code']
-        folder = STOCK_ROOT + DATA_FOLDERS['index']
+        folder = DATA_ROOT + DATA_FOLDERS['index']
         codes = re.compile('(\d+)')
         self.idx_list = []
         for file in os.listdir(folder):
@@ -75,12 +78,12 @@ class _DataManager(metaclass = SingletonMeta):
 
     def _create_all_folders(self):
         for key in DATA_FOLDERS:
-            folder = STOCK_ROOT + DATA_FOLDERS[key]
+            folder = DATA_ROOT + DATA_FOLDERS[key]
             if not os.path.exists(folder):
                 os.makedirs(folder)
 
     def csv_path(self, category, code):
-        folder = STOCK_ROOT + DATA_FOLDERS[category] + '\\'
+        folder = DATA_ROOT + DATA_FOLDERS[category] + '\\'
         return folder + '%s.csv' % code
 
     def read_csv(self, category, code, if_regular = True):
@@ -319,7 +322,7 @@ class _DataWasher(metaclass = SingletonMeta):
     # region one time active for files
 
     def simplify_dirs(cls, category):
-        folder = STOCK_ROOT + DATA_FOLDERS[category] + '\\'
+        folder = DATA_ROOT + DATA_FOLDERS[category] + '\\'
         prefix = re.compile('([0-9]*.csv)')
         for file in os.listdir(folder):
             new_file = prefix.search(file)[0]
