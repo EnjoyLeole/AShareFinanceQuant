@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, date
+import numpy as np
 
 DATE_SEPARATOR = '-'
 QUARTER_SEPARATOR = 'Q'
@@ -40,32 +41,48 @@ def str2date(str, day_delta = 0):
 
 
 def date2str(date):
-    return __std_date(date.year, date.month, date.day)
+    y, m, d = __parse_date(date)
+    return __std_date(y, m, d)
+
+
+def date_str2std(str):
+    year, m, d = __parse_str(str)
+    return __std_date(year, m, d)
 
 
 def __std_date(year, month, day):
+    if year is None or month is None or day is None:
+        return np.nan
     return '%s%s%s%s%s' % (year, DATE_SEPARATOR, month, DATE_SEPARATOR, day)
 
 
 def __parse_str(str):
     if str != str:
         return None, None, None
+
     if '/' in str:
         sep = '/'
+    elif '--' in str:
+        sep = '--'
     elif '-' in str:
         sep = '-'
     else:
+        sep = None
+    if sep is not None:
+        year, m, d = str.split(sep)
+    elif len(str) == 8:
+        year = str[0:4]
+        m = str[4:6]
+        d = str[6:]
+    else:
         return None, None, None
     # print(str)
-    year, m, d = str.split(sep)
+
+    if year == 'None':
+        return None, None, None
     m = m.zfill(2)
     d = d.zfill(2)
     return year, m, d
-
-
-def date_str2std(str):
-    year, m, d = __parse_str(str)
-    return __std_date(year, m, d)
 
 
 def __parse_date(date_str):
@@ -83,7 +100,7 @@ def __parse_date(date_str):
 
     if isinstance(date_str, str):
         y, m, d = __parse_str(date_str)
-        if y is None:
+        if y is None or y == 'None':
             return None, None, None
         else:
             return y, m, d
@@ -169,11 +186,11 @@ def quarter_add(quarter, i):
     return '%s%s%s' % (year, QUARTER_SEPARATOR, q)
 
 
-def quarter_range(start_year=1988, end_year=None):
+def quarter_range(start_year = 1988, end_year = None):
     if end_year is None:
-        end_year=today().year
+        end_year = today().year
     list = []
-    for year in range(start_year, end_year+1):
+    for year in range(start_year, end_year + 1):
         for quarter in range(1, 5):
             list.append('%s%s%s' % (year, QUARTER_SEPARATOR, quarter))
     return list

@@ -4,7 +4,7 @@ from .dataio import *
 import json
 
 
-class _DataUpdater(metaclass = SingletonMeta):
+class _WebUpdater(metaclass = SingletonMeta):
     def everything(self):
         self.all_idx()
         self.all_stock()
@@ -18,13 +18,13 @@ class _DataUpdater(metaclass = SingletonMeta):
         Tuget.override_category()
 
     def all_finance(cls):
-        DMgr.iter_stocks(N163.override_finance, 'financial_override')
+        DMgr.iter_stocks(N163.override_finance, 'financial_override', num_process = 12)
 
     def all_stock(self):
-        DMgr.iter_stocks(self._update_stock_hist, 'stock_update')
+        DMgr.iter_stocks(self._update_stock_hist, 'stock_update', num_process = 12)
 
     def all_idx(self):
-        DMgr.iter_index(self._update_idx_hist, 'index_update')
+        DMgr.iter_index(self._update_idx_hist, 'index_update', num_process = 12)
 
     def _update_idx_hist(cls, code):
         category = 'index'
@@ -37,12 +37,12 @@ class _DataUpdater(metaclass = SingletonMeta):
             lambda start_year: N163.fetch_stock_combined_his(code, start_year))
 
 
-Updater = _DataUpdater()
+WebUpdater = _WebUpdater()
 
 
 class N163(object):
     # 0 for index   1 for stock
-    url_his = "http://quotes.money.163.com/service/chddata.html?code=%s%s&start=%s&end=%s"
+    url_his = "http://quotes.money.163.com/service/chddata.html?code=%s%s&start=%s"
     url_finance = {
         "indicator": "https://quotes.money.163.com/service/zycwzb_%s.html?type=report",
         "balance"  : "https://quotes.money.163.com/service/zcfzb_%s.html",
@@ -73,11 +73,15 @@ class N163(object):
     @classmethod
     def fetch_stock_combined_his(cls, code, start, end = None):
         his = cls.fetch_hist(code, start, end)
-        if his.shape[0] == 0 or (his['close'] == 0).all():
+        if his is None:
             return None
 
         his = his[his['close'] != 0]
-        derc = cls.fetch_derc(code, start.year, end.year if end is not None else None)
+        if isinstance(start, str):
+            start_year = int(start.split(DATE_SEPARATOR)[0])
+        else:
+            start_year = start.year
+        derc = cls.fetch_derc(code, start_year, end.year if end is not None else None)
         if derc is not None:
             df = pd.merge(his, derc, on = 'date', how = 'left')
             df['factor'] = df['derc_close'] / df['close']
@@ -106,7 +110,7 @@ class N163(object):
                            'volume', 'change_rate'])
 
             df.drop(['volume', 'change_rate'], axis = 1, inplace = True)
-            df['date'] = df['date'].apply(lambda row: date_str2std)
+            df['date'] = df['date'].apply(date_str2std)
             return df
 
         derc = pd.DataFrame()
@@ -126,13 +130,19 @@ class N163(object):
 
     @classmethod
     def fetch_hist(cls, code, start = None, end = None, index = False):
-        end = today() if end is None else end
-        start_str = date2str(start, '')
-        end_str = date2str(end, '')
+        if end is not None:
+            end = '&end=%s' % end
+        else:
+            end = ''
+
+        start_str = date2str(start).replace(DATE_SEPARATOR,'')
+        end_str = date2str(end)
         i = (0 if code[0] == '0' else 1) if index else (0 if code[0] == '6' else 1)
-        url = cls.url_his % (i, code, start_str, end_str)
+        url = cls.url_his % (i, code, start_str) + end
         # print(url)
         df = pd.read_csv(url, encoding = GBK)
+        if df.shape[0] == 0:
+            return None
         flag = 'index_tick' if index else 'hist_tick'
         DWash.raw_regularI(df, flag)
         df.sort_values('date', inplace = True)

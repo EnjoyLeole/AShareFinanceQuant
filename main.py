@@ -33,7 +33,7 @@ eqt = '21361470000.0+107340000.0+7131370000.0+976342054116.0/21361470000.0+0.0+0
 
 # region web
 def all_update():
-    Updater.all_idx()
+    WebUpdater.all_idx()
 
 
 def idx_hit():
@@ -46,7 +46,7 @@ def N163_test():
 
 
 def derc_test():
-    df = Updater._update_stock_derc(bcode)
+    df = WebUpdater._update_stock_derc(bcode)
     # df=N163.fetch_derc(bcode, 2013)
     print(df)
 
@@ -205,9 +205,12 @@ def code_re():
 # endregion
 
 def df_test():
-    df = DMgr.read_csv('target', 'PE')
-    result = df.eval('log10(close)')
-    print(result)
+    df = DMgr.read_csv('stock_target', bcode)
+    se = df['PE']
+    se1 = se.values.reshape(1, -1)
+    print(se.shape, se1.shape)
+    # result = df.eval('log10(close)')
+    # print(result)
 
 
 def index_target_test(code = '399300'):
@@ -229,21 +232,26 @@ def stock_vector_test(code = hr, target = None):
 error_file = 'error_reshow.txt'
 
 
-def error_reshow(name):
-    list = file2obj(get_error_path(name))
+def error_reshow():
+    path = get_error_path('') if False else 'D:/%s.txt' % 'target_calc'
+    list = file2obj(path)
     list = [x[1] for x in list]
-    res = loop(lambda code: stock_vector_test(code = code), list, 1, flag = 'error_reshow')
+    res = loop(lambda code: stock_vector_test(code = code), list, 1, flag = 'error_reshow',
+        if_debug = True)
     obj2file(get_error_path(error_file), res)
     print(res)
 
 
 def test():
-    Cluster.stock2target()
+    # Cluster.stock2target(False)
+    Cluster.stat('PE')
     # df_test()
-    # error_reshow(error_file)
-    # stock_vector_test('000016')
+
+    # error_reshow()
     # Stocks.update_all_stock_targets()
-    # print(quarter_range())
+    # WebUpdater.all_stock()
+    # WebUpdater._update_stock_hist('000002')
+    # N163.fetch_derc('000002', 2015)
 
 
 # region numba

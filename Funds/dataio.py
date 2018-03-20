@@ -1,6 +1,5 @@
 from Meta import *
-from Basic.Util import *
-from Basic.IO import *
+from Basic import *
 import os, re
 import numpy as np
 import pandas as pd
@@ -80,12 +79,12 @@ class _DataManager(metaclass = SingletonMeta):
             if not os.path.exists(folder):
                 os.makedirs(folder)
 
-    def __csv_path(self, category, code):
+    def csv_path(self, category, code):
         folder = STOCK_ROOT + DATA_FOLDERS[category] + '\\'
         return folder + '%s.csv' % code
 
     def read_csv(self, category, code, if_regular = True):
-        path = self.__csv_path(category, code)
+        path = self.csv_path(category, code)
         if not os.path.exists(path):
             return None
         df = pd.read_csv(path, encoding = GBK)
@@ -97,7 +96,7 @@ class _DataManager(metaclass = SingletonMeta):
 
     def save_csv(self, df: pd.DataFrame, category, code, encode = GBK, index = False,
                  ifRegular = True):
-        path = self.__csv_path(category, code)
+        path = self.csv_path(category, code)
         # DWash.value_scale_by_column_name(df)
         # if ifRegular:
         #     DWash.column_regularI(df, category)
@@ -113,6 +112,12 @@ class _DataManager(metaclass = SingletonMeta):
             exist = pd.DataFrame()
             start = OLDEST_DATE
         else:
+            # todo simple in future
+            exist[index] = exist[index].apply(date_str2std)
+            exist = exist[exist[index] == exist[index]]
+            # todo just for once
+            exist = exist[exist['derc_close'] == exist['derc_close']]
+
             idx = exist[index]
             if idx[0] > idx[1]:
                 exist.sort_values(index, inplace = True)

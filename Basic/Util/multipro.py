@@ -1,11 +1,12 @@
 import time
 import os
 import numpy as np
+from Basic.IO import obj2file
 from pathos.multiprocessing import ProcessingPool as Pool
 
 
 def loop(func, para_list, num_process = 1, flag = '', times = 1, delay = 0,
-         show_seq = False, limit = -1):
+         show_seq = False, limit = -1,if_debug=False):
     def _process(arr):
         pid = os.getpid()
         fails = []
@@ -15,19 +16,23 @@ def loop(func, para_list, num_process = 1, flag = '', times = 1, delay = 0,
                 print(pid, count, flag, para)
                 count += 1
             for i in range(times):
-                try:
+                if if_debug:
                     func(para)
                     break
-                except TimeoutError as e:
-                    if i == times - 1:
+                else:
+                    try:
+                        func(para)
+                        break
+                    except TimeoutError as e:
+                        if i == times - 1:
+                            print(e)
+                            fails.append([flag, para])
+                        if delay > 0:
+                            time.sleep(delay)
+                    except Exception as e:
                         print(e)
                         fails.append([flag, para])
-                    if delay > 0:
-                        time.sleep(delay)
-                except Exception as e:
-                    print(e)
-                    fails.append([flag, para])
-                    break
+                        break
 
         return fails
 
@@ -44,4 +49,5 @@ def loop(func, para_list, num_process = 1, flag = '', times = 1, delay = 0,
         failures = []
         for f in fails:
             failures += f
+    obj2file('D:/%s.txt'%flag,failures)
     return failures

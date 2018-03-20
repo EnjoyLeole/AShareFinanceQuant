@@ -202,7 +202,11 @@ class Ticks(object):
 
         self.report, self.tick = raw_data_fetch()
 
-        if self.report is None: return
+        if self.report is None or self.tick is None or self.tick.shape[0] == 0:
+            self.NonData = True
+            return
+        else:
+            self.NonData = False
         self.lastQuarter = self.report['quarter'].iloc[-1]
 
         self.target_category = self.type + '_target'
@@ -231,12 +235,12 @@ class Ticks(object):
             self.major = pd.merge(self.major, self.targets, on = 'quarter', how = 'left')
 
     def save_targets(self):
-        if self.formulas is not None:
+        if not self.NonData:
             DMgr.save_csv(self.targets, self.target_category, self.code)
             DMgr.save_csv(self.tick, self.type, self.code)
 
     def calc_all_vector(self):
-        if self.formulas is None:
+        if self.NonData:
             return None
         cols = []
         for i, formula in self.formulas.iterrows():
@@ -467,6 +471,10 @@ class Stocks(Ticks):
     @classmethod
     def update_all_stock_targets(self):
         def calc(code):
+            if os.path.getmtime(DMgr.csv_path('stock_target', code)) >= datetime(2018, 3, 18, 23,
+                    0).timestamp():
+                print('%s jumped' % code)
+                return
             # print(code + ' start')
             stk = Stocks(code)
             res = stk.calc_all_vector()
@@ -474,7 +482,7 @@ class Stocks(Ticks):
                 stk.save_targets()
             # print(code + ' saved')
 
-        DMgr.iter_stocks(calc, 'target_calc', show_seq = True)
+        DMgr.iter_stocks(calc, 'target_calc', show_seq = True, num_process = 7)
 
     def __init__(self, code):
         def __get_table():
@@ -493,16 +501,15 @@ class Stocks(Ticks):
                     else:
                         report = pd.merge(report, df, on = 'quarter',
                             suffixes = ('', DWash.DUPLICATE_SEPARATOR + tb + DWash.DUPLICATE_FLAG))
-            if report.shape[0] > 0:
+            if report is not None and report.shape[0] > 0:
                 DWash.column_selectI(report)
                 report.index = report.quarter
                 report.sort_index(inplace = True)
 
             tick = DMgr.read_csv('stock', code)
             if tick is not None:
-                # for col in ['Rmonthly', 'SIGMA', 'RSIZE', 'PRICE']:
-                #     if col in tick:
-                #         tick.drop(col, axis = 1)
+
+                tick = tick.drop_duplicates(subset = 'date', keep = 'first')  # todo only once
                 tick = tick[tick.close != 0]
                 DWash.get_changeI(tick)
                 tick.sort_values('date', inplace = True)

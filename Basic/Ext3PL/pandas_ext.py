@@ -1,5 +1,5 @@
 import pandas as pd
-from .mydatetime import INTERVAL_TRANSFER
+from Basic.Util.mydatetime import INTERVAL_TRANSFER
 
 DUPLICATE_FLAG = '_d'
 FORCE_FILLED = 'force_filled'
@@ -27,6 +27,7 @@ def truncate_period(df, truncate_val, truncate_col = 'quarter'):
     df.sort_values(truncate_col, inplace = True)
     last = df.iloc[-1]
     if last[truncate_col] != truncate_val:
+
         df.loc[truncate_val, :] = last
         df.loc[truncate_val, truncate_col] = truncate_val
     return df
