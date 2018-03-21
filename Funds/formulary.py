@@ -10,10 +10,49 @@ LONG_TERM_RETURN = .12
 INDEX_FLAG = 'Index_'
 RESERVED_KEYWORDS = ['math', 'log', 'log10']
 
+Idx_dict = {
+    'ALL'  : ['all', '000001'],
+    'HS300': ['hs300', '399300'],
+    'SZ50' : ['sz50', '000016'],
+    'ZZ500': ['zz500', '000905']}
 
+HS300 = None
+
+
+# todo Dupt  detail into ATO
+# todo compare MG & MS cross the market
 def discount(year):
     return 1 / math.pow(1 + CAPITAL_COST, year)
 
+
+# region reduce methods
+
+@numba.jit
+def increase(arr):
+    return arr[-1] - arr[0]
+
+
+@numba.jit
+def change(arr):
+    return arr[-1] / arr[0] - 1 if arr[0] != 0 else 0
+
+
+@numba.jit
+def vix_yearly(arr):
+    return (sum(arr ** 2) * 252 / len(arr)) ** 0.5
+
+
+@numba.jit
+def percent_geometric(arr):
+    return -1 + reduce(lambda accum, x: accum * (1 + x), arr, 1) ** (1 / len(arr))
+
+
+@numba.jit
+def decline_avg(arr):
+    return reduce(lambda accum, x: (accum + x) * 2 ** (-1 / 3), arr, 0)
+
+
+# endregion
 
 class Macro(object):
     tbs = {
@@ -79,35 +118,6 @@ class Macro(object):
     #     merged['interest/shibor'] = merged['profit/cap'] / merged['1Y'] * 100
     #     DMgr.save_csv(merged, 'temp', 'market_pe')
 
-
-# region reduce methods
-
-@numba.jit
-def increase(arr):
-    return arr[-1] - arr[0]
-
-
-@numba.jit
-def change(arr):
-    return arr[-1] / arr[0] - 1 if arr[0] != 0 else 0
-
-
-@numba.jit
-def vix_yearly(arr):
-    return (sum(arr ** 2) * 252 / len(arr)) ** 0.5
-
-
-@numba.jit
-def percent_geometric(arr):
-    return -1 + reduce(lambda accum, x: accum * (1 + x), arr, 1) ** (1 / len(arr))
-
-
-@numba.jit
-def decline_avg(arr):
-    return reduce(lambda accum, x: (accum + x) * 2 ** (-1 / 3), arr, 0)
-
-
-# endregion
 
 class _FinancialFormula(metaclass = SingletonMeta):
 
@@ -454,21 +464,7 @@ class Indexs(Ticks):
     #     return concat
 
 
-Idx_dict = {
-    'ALL'  : ['all', '000001'],
-    'HS300': ['hs300', '399300'],
-    'SZ50' : ['sz50', '000016'],
-    'ZZ500': ['zz500', '000905']}
-
-HS300 = Indexs(*Idx_dict['HS300'])
-
-
-# todo Dupt  detail into ATO
-# todo compare MG & MS cross the market
-
 class Stocks(Ticks):
-
-
 
     def __init__(self, code):
         def __get_table():
@@ -494,7 +490,6 @@ class Stocks(Ticks):
 
             tick = DMgr.read_csv('stock', code)
             if tick is not None:
-
                 tick = tick.drop_duplicates(subset = 'date', keep = 'first')  # todo only once
                 tick = tick[tick.close != 0]
                 DWash.get_changeI(tick)
@@ -502,6 +497,9 @@ class Stocks(Ticks):
 
             return report, tick
 
+        global HS300
+        if HS300 is None:
+            HS300 = Indexs(*Idx_dict['HS300'])
         super().__init__(code, lambda target: INDEX_FLAG not in target, __get_table, 'stock', HS300)
 
     def RIM(self, quarter = None):

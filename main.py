@@ -30,6 +30,8 @@ tdf = pd.DataFrame(list, columns = ['A', 'B', 'B'])
 formula = 'market_cap+total_liability-1cas3423h_at_end0~2+1200'
 eqt = '21361470000.0+107340000.0+7131370000.0+976342054116.0/21361470000.0+0.0+0.0'
 
+error_file = 'error_reshow.txt'
+
 
 # region web
 def all_update():
@@ -204,6 +206,23 @@ def code_re():
 
 # endregion
 
+# region numba
+li = [x for x in range(100)]
+li = numpy.array(li)
+
+
+def python(arr = li):
+    val = sum(arr)
+    # print(val)
+
+
+@numba.jit
+def numba(arr = li):
+    val = sum(arr)
+    # print(val)
+
+
+# endregion
 def df_test():
     df = DMgr.read_csv('stock_target', bcode)
     se = df['PE']
@@ -229,11 +248,8 @@ def stock_vector_test(code = hr, target = None):
     # print(datetime.now() - t0)
 
 
-error_file = 'error_reshow.txt'
-
-
 def error_reshow():
-    path = get_error_path('') if False else 'D:/%s.txt' % 'target_calc'
+    path = get_error_path('')
     list = file2obj(path)
     list = [x[1] for x in list]
     res = loop(lambda code: stock_vector_test(code = code), list, 1, flag = 'error_reshow',
@@ -243,28 +259,10 @@ def error_reshow():
 
 
 def test():
-    # df_test()
-    Updater.all_cluster_target_stat()
+    # Updater.all_cluster_target_stat()
+    Analysis.cluster_separate_by_code(bcode)
     # error_reshow()
 
-
-# region numba
-li = [x for x in range(100)]
-li = numpy.array(li)
-
-
-def python(arr = li):
-    val = sum(arr)
-    # print(val)
-
-
-@numba.jit
-def numba(arr = li):
-    val = sum(arr)
-    # print(val)
-
-
-# endregion
 
 if __name__ == '__main__':
     print('start')

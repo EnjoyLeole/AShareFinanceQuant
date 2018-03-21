@@ -8,24 +8,23 @@ from urllib3 import PoolManager
 OLDEST_DATE = '1988-01-01'
 
 DATA_FOLDERS = {
-    'indicator'   : 'financial_indicator',
-    'balance'     : 'financial_balance',
-    'cash_flow'   : 'financial_cash_flow',
-    'income'      : 'financial_income',
-    'index'       : 'market_index',
-    'macro'       : 'macro',
-    'stock'       : 'market_stock',
-    'temp'        : 'temp',
-    'stock_target': 'target_stock',
-    'index_target': 'target_index',
-    'category'    : 'category',
-    'target'      : 'cluster_target'}
+    'indicator'     : 'financial_indicator',
+    'balance'       : 'financial_balance',
+    'cash_flow'     : 'financial_cash_flow',
+    'income'        : 'financial_income',
+    'index'         : 'market_index',
+    'macro'         : 'macro',
+    'stock'         : 'market_stock',
+    'temp'          : 'temp',
+    'stock_target'  : 'target_stock',
+    'index_target'  : 'target_index',
+    'category'      : 'category',
+    'cluster_target': 'cluster_target',
+    'main_select'   : 'main_select'}
 TICK = 'ticks_daily'
 REPORT = 'financial_report_quarterly'
 
 TTM_SUFFIX = '_ttm'
-
-
 
 
 def get_url(url, encoding = ''):
@@ -48,8 +47,8 @@ class _DataManager(metaclass = SingletonMeta):
     cl_path = DATA_ROOT + 'code_list.csv'
 
     def __init__(self):
-        set_failure_path(get_error_path)
-
+        put_failure_path(get_error_path)
+        self._create_all_folders()
         self.code_table = pd.read_csv(self.cl_path, encoding = GBK)
         self.active_table = self.code_table[self.code_table.stop == False]
         self.code_list = self.code_table['code']
@@ -91,18 +90,11 @@ class _DataManager(metaclass = SingletonMeta):
         if not os.path.exists(path):
             return None
         df = pd.read_csv(path, encoding = GBK)
-        # DWash.value_scale_by_column_name(df)
-        # # print(df)
-        # if ifRegular:
-        #     DWash.column_regularI(df, category)
         return df
 
     def save_csv(self, df: pd.DataFrame, category, code, encode = GBK, index = False,
                  ifRegular = True):
         path = self.csv_path(category, code)
-        # DWash.value_scale_by_column_name(df)
-        # if ifRegular:
-        #     DWash.column_regularI(df, category)
         df.to_csv(path, index = index, encoding = encode)
 
     def update_csv(self, category, code, fetcher, index = 'date'):

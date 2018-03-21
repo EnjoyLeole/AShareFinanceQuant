@@ -9,7 +9,7 @@ DEBUG = True
 MULTIPROCESS_FAILURE_FILE = lambda flag: 'D:/%s.txt' % flag
 
 
-def set_failure_path(func):
+def put_failure_path(func):
     global MULTIPROCESS_FAILURE_FILE
     MULTIPROCESS_FAILURE_FILE = func
 
@@ -59,14 +59,10 @@ def loop(func, para_list, num_process = 1, flag = '', times = 1, delay = 0,
         arr_list = np.array_split(para_list, num_process)
         print(num_process, len(para_list))
         pool = Pool()
-        results, fails = pool.map(_process, arr_list)
+        outs = pool.map(_process, arr_list)
         pool.close()
-        failures = []
-        for f in fails:
-            failures += f
-
-        final_result = []
-        for r in results:
-            final_result += r
-    obj2file(MULTIPROCESS_FAILURE_FILE(flag), failures)
+        final_result = [r for x in outs for r in x[0]]
+        failures = [f for x in outs for f in x[1]]
+    if len(failures) > 0:
+        obj2file(MULTIPROCESS_FAILURE_FILE(flag), failures)
     return final_result

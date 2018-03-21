@@ -15,8 +15,8 @@ class Updater:
         cls.all_macro()
 
         # target calc
-        cls.all_stock_target_update()
-        cls.all_stock_target_cluster()
+        cls.all_target_update()
+        cls.all_target_cluster()
         cls.all_cluster_target_stat()
 
     # region raw data
@@ -42,7 +42,7 @@ class Updater:
     # endregion
 
     @classmethod
-    def all_stock_target_update(cls):
+    def all_target_update(cls):
         def calc(code):
             if os.path.getmtime(DMgr.csv_path('stock_target', code)) >= datetime(2018, 3, 18, 23,
                     0).timestamp():
@@ -58,7 +58,7 @@ class Updater:
         DMgr.iter_stocks(calc, 'target_calc', show_seq = True, num_process = 7)
 
     @classmethod
-    def all_stock_target_cluster(cls, if_by_row = True):
+    def all_target_cluster(cls, if_by_row = True):
         axis = 0 if if_by_row else 1
         clusters = {}
         all_quarters = quarter_range()
@@ -98,52 +98,94 @@ class Updater:
                 clusters[target]['quarter'] = clusters[target].index
             else:
                 clusters[target]['code'] = clusters[target].index
-            DMgr.save_csv(df, 'target', target)
+            DMgr.save_csv(df, 'cluster_target', target)
 
     @classmethod
     def all_cluster_target_stat(cls):
-        loop(cls.cluster_target_stat, Formula.key_targets, num_process = 4,
-            flag = 'cluster_target_stat')
+        loop(cls.cluster_target_stat, Formula.key_targets, num_process = 6,
+            flag = 'cluster_target_stat', show_seq = True)
 
     @classmethod
-    def cluster_target_stat(self, target, quarter = None):
-        df = DMgr.read_csv('target', target)
+    def cluster_target_stat(self, target):
+        df = DMgr.read_csv('cluster_target', target)
         df.index = df['quarter']
         df.drop('quarter', axis = 1, inplace = True)
-        df = df.T
-        df.dropna(axis = 1, how = 'all', inplace = True)
-        for col in df:
-            series = df[col]
-            val_count = (series == series).sum()
-            if val_count < df.shape[0] / 10:
-                continue
+        # df = df.T
+        df.dropna(axis = 0, how = 'all', inplace = True)
 
-            mu, sigma = normal_test(series, target, col)
+        def row_sub(row):
+            series = row
+            quarter = row.name
+            val_count = (series == series).sum()
+            if val_count < row.size / 10:
+                return
+
+            mu, sigma = normal_test(series,
+                '%s at %s with %s points' % (target, quarter, val_count))
             ids = [i for i in range(val_count)]
             na = [np.nan for i in range(series.size - val_count)]
 
             sorted = series.sort_values()
             ids = pd.Series(ids + na, index = sorted.index)
-            # sorted[PERCENTILE] = 1
-            # sorted_ids=sorted.reset_index()
-            df[col + PERCENTILE] = ids / val_count
-            df[col + STD_DISTANCE] = (series - mu) / sigma
+            df.loc[quarter + PERCENTILE] = ids / val_count
+            df.loc[quarter + STD_DISTANCE] = (series - mu) / sigma
+
+        df.apply(row_sub, axis = 1)
+        df['quarter'] = df.index
+        DMgr.save_csv(df, 'cluster_target', target + TRANSPOSE)
+
+    @classmethod
+    def cluster_target_stat_transpose(self, target):
+        df = DMgr.read_csv('cluster_target', target)
+        df.index = df['quarter']
+        df.drop('quarter', axis = 1, inplace = True)
+        df = df.T
+        df.dropna(axis = 1, how = 'all', inplace = True)
+        for quarter in df:
+            series = df[quarter]
+            val_count = (series == series).sum()
+            if val_count < df.shape[0] / 10:
+                continue
+
+            mu, sigma = normal_test(series,
+                '%s at %s with %s points' % (target, quarter, val_count))
+            ids = [i for i in range(val_count)]
+            na = [np.nan for i in range(series.size - val_count)]
+
+            sorted = series.sort_values()
+            ids = pd.Series(ids + na, index = sorted.index)
+            df[quarter + PERCENTILE] = ids / val_count
+            df[quarter + STD_DISTANCE] = (series - mu) / sigma
 
         df['code'] = df.index
-        DMgr.save_csv(df, 'target', target + TRANSPOSE)
+        DMgr.save_csv(df, 'cluster_target', target + TRANSPOSE)
 
 
-class Analysis:
+class _Analysis:
     def __init__(self):
+        # self.fetch_all_cluster_target_stat()
         pass
 
+    def fetch_all_cluster_target_stat(self):
+        targets = {}
+        for target in Formula.key_targets:
+            df = DMgr.read_csv('cluster_target', target + TRANSPOSE)
+            df.index = df.quarter
+            targets[target] = df
+        return targets
 
-class _Cluster(metaclass = SingletonMeta):
+    def cluster_separate_by_code(self, code, quarter = None):
+        comb = pd.DataFrame()
+        targets=self.fetch_all_cluster_target_stat()
+        for target in Formula.key_targets:
+            if quarter is None:
+                comb[target] = targets[target][code]
+            else:
+                for idx in [quarter, quarter + PERCENTILE, quarter + STD_DISTANCE]:
+                    comb.loc[idx, target] = self.targets[target].at[idx, code]
+        comb['quarter'] = comb.index
+        DMgr.save_csv(comb, 'main_select', code)
+        return comb
 
-    def __init__(self, code_list):
-        self.code_list = code_list
 
-        # print(df)
-
-
-Cluster = _Cluster(DMgr.code_list)
+Analysis = _Analysis()
