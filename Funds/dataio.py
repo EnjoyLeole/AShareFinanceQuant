@@ -85,15 +85,14 @@ class _DataManager(metaclass = SingletonMeta):
         folder = DATA_ROOT + DATA_FOLDERS[category] + '\\'
         return folder + '%s.csv' % code
 
-    def read_csv(self, category, code, if_regular = True):
+    def read_csv(self, category, code):
         path = self.csv_path(category, code)
         if not os.path.exists(path):
             return None
         df = pd.read_csv(path, encoding = GBK)
         return df
 
-    def save_csv(self, df: pd.DataFrame, category, code, encode = GBK, index = False,
-                 ifRegular = True):
+    def save_csv(self, df: pd.DataFrame, category, code, encode = GBK, index = False):
         path = self.csv_path(category, code)
         df.to_csv(path, index = index, encoding = encode)
 
@@ -135,11 +134,11 @@ class _DataManager(metaclass = SingletonMeta):
             DMgr.save_csv(new, category, code)
             return new
 
-    def iter_stocks(self, func, flag, show_seq = False, num_process = 4, limit = -1):
+    def loop_stocks(self, func, flag, show_seq = False, num_process = 4, limit = -1):
         loop(func, self.code_list, num_process = num_process, flag = flag, show_seq = show_seq,
             limit = limit)
 
-    def iter_index(self, func, flag, show_seq = False, num_process = 4, limit = -1):
+    def loop_index(self, func, flag, show_seq = False, num_process = 4, limit = -1):
         loop(func, self.idx_list, num_process = num_process, flag = flag, show_seq = show_seq,
             limit = limit)
 

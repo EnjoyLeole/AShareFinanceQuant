@@ -1,7 +1,7 @@
 from .formulary import *
 
 PERCENTILE = '_percentile'
-STD_DISTANCE = '_std_distance'
+STD_DISTANCE = '_sd'
 TRANSPOSE = '_T'
 
 
@@ -17,7 +17,7 @@ class Updater:
         # target calc
         cls.all_target_update()
         cls.all_target_cluster()
-        cls.all_cluster_target_stat()
+        cls.all_cluster_separate()
 
     # region raw data
     @classmethod
@@ -29,18 +29,19 @@ class Updater:
 
     @classmethod
     def all_finance(cls):
-        DMgr.iter_stocks(N163.override_finance, 'financial_override', num_process = 12)
+        DMgr.loop_stocks(N163.override_finance, 'financial_override', num_process = 12)
 
     @classmethod
     def all_stock(cls):
-        DMgr.iter_stocks(N163.update_stock_hist, 'stock_update', num_process = 12)
+        DMgr.loop_stocks(N163.update_stock_hist, 'stock_update', num_process = 12)
 
     @classmethod
     def all_idx(cls):
-        DMgr.iter_index(N163.update_idx_hist, 'index_update', num_process = 12)
+        DMgr.loop_index(N163.update_idx_hist, 'index_update', num_process = 12)
 
     # endregion
 
+    # region target
     @classmethod
     def all_target_update(cls):
         def calc(code):
@@ -55,137 +56,97 @@ class Updater:
                 stk.save_targets()
             # print(code + ' saved')
 
-        DMgr.iter_stocks(calc, 'target_calc', show_seq = True, num_process = 7)
+        DMgr.loop_stocks(calc, 'target_calc', show_seq = True, num_process = 7)
 
     @classmethod
-    def all_target_cluster(cls, if_by_row = True):
-        axis = 0 if if_by_row else 1
+    def all_target_cluster(cls):
         clusters = {}
         all_quarters = quarter_range()
 
         for code in DMgr.code_list:
             print(code)
+            # if code >= '000109':
+            #     break
+
             df = DMgr.read_csv('stock_target', code)
             if df is None:
                 continue
             df.index = df.quarter
             for target in Formula.key_targets:
                 if target in df:
-                    if axis == 0:
-                        if target not in clusters:
-                            clusters[target] = pd.DataFrame(index = all_quarters)
-                        clusters[target][code] = df[target]
-                    else:
-                        def get_selected():
-                            selected = df[[target]].T
-                            selected.index = [code]
-                            return selected
+                    if target not in clusters:
+                        clusters[target] = pd.DataFrame(index = all_quarters)
+                    clusters[target][code] = df[target]
 
-                        if target not in clusters:
-                            # clusters[target] = pd.DataFrame()
-
-                            clusters[target] = get_selected()
-                            # print(clusters)
-                        else:
-                            clusters[target] = pd.concat(
-                                [clusters[target], get_selected()])
-                            print(clusters)
-
-        for target in clusters:
+        def cluster_stat(target):
             df = clusters[target]
-            df.dropna(axis = axis, how = 'all', inplace = True)
-            if axis == 0:
-                clusters[target]['quarter'] = clusters[target].index
-            else:
-                clusters[target]['code'] = clusters[target].index
+            df.dropna(axis = 0, how = 'all', inplace = True)
+            percentile = pd.DataFrame(columns = df.columns + PERCENTILE)
+            std_dis = pd.DataFrame(columns = df.columns + STD_DISTANCE)
+
+            def row_normal_stat(row):
+                series = row
+                quarter = row.name
+                val_count = (series == series).sum()
+                if val_count < row.size / 10 or val_count < 20:
+                    return
+                # print(val_count)
+                mu, sigma = normal_test(series,
+                    '%s at %s with %s points' % (target, quarter, val_count))
+                ids = [i for i in range(val_count)]
+                na = [np.nan for i in range(series.size - val_count)]
+
+                sorted = series.sort_values()
+                ids = pd.Series(ids + na, index = sorted.index + PERCENTILE)
+                percentile.loc[quarter] = ids / val_count
+                sd = (series - mu) / sigma
+                sd.index = series.index + STD_DISTANCE
+                std_dis.loc[quarter] = sd
+
+            df.apply(row_normal_stat, axis = 1)
+            df = pd.merge(df, percentile, how = 'left', left_index = True, right_index = True)
+            df = pd.merge(df, std_dis, how = 'left', left_index = True, right_index = True)
+            df['quarter'] = df.index
             DMgr.save_csv(df, 'cluster_target', target)
 
-    @classmethod
-    def all_cluster_target_stat(cls):
-        loop(cls.cluster_target_stat, Formula.key_targets, num_process = 6,
+        loop(cluster_stat, Formula.key_targets, num_process = 1,
             flag = 'cluster_target_stat', show_seq = True)
 
     @classmethod
-    def cluster_target_stat(self, target):
-        df = DMgr.read_csv('cluster_target', target)
-        df.index = df['quarter']
-        df.drop('quarter', axis = 1, inplace = True)
-        # df = df.T
-        df.dropna(axis = 0, how = 'all', inplace = True)
+    def all_cluster_separate(cls):
+        targets = cls.fetch_all_cluster_target_stat()
 
-        def row_sub(row):
-            series = row
-            quarter = row.name
-            val_count = (series == series).sum()
-            if val_count < row.size / 10:
-                return
+        def cluster_separate_by_code(code):
+            comb = pd.DataFrame()
+            for target in Formula.key_targets:
+                if code not in targets[target]:
+                    continue
+                comb[target] = targets[target][code]
 
-            mu, sigma = normal_test(series,
-                '%s at %s with %s points' % (target, quarter, val_count))
-            ids = [i for i in range(val_count)]
-            na = [np.nan for i in range(series.size - val_count)]
+            comb.dropna(axis = 0, how = 'all', inplace = True)
+            comb['quarter'] = comb.index
+            DMgr.save_csv(comb, 'main_select', code)
+            # return comb
 
-            sorted = series.sort_values()
-            ids = pd.Series(ids + na, index = sorted.index)
-            df.loc[quarter + PERCENTILE] = ids / val_count
-            df.loc[quarter + STD_DISTANCE] = (series - mu) / sigma
+        DMgr.loop_stocks(cluster_separate_by_code, 'cluster_separate', show_seq = True,
+            num_process = 7)
 
-        df.apply(row_sub, axis = 1)
-        df['quarter'] = df.index
-        DMgr.save_csv(df, 'cluster_target', target + TRANSPOSE)
+    # endregion
 
     @classmethod
-    def cluster_target_stat_transpose(self, target):
-        df = DMgr.read_csv('cluster_target', target)
-        df.index = df['quarter']
-        df.drop('quarter', axis = 1, inplace = True)
-        df = df.T
-        df.dropna(axis = 1, how = 'all', inplace = True)
-        for quarter in df:
-            series = df[quarter]
-            val_count = (series == series).sum()
-            if val_count < df.shape[0] / 10:
-                continue
-
-            mu, sigma = normal_test(series,
-                '%s at %s with %s points' % (target, quarter, val_count))
-            ids = [i for i in range(val_count)]
-            na = [np.nan for i in range(series.size - val_count)]
-
-            sorted = series.sort_values()
-            ids = pd.Series(ids + na, index = sorted.index)
-            df[quarter + PERCENTILE] = ids / val_count
-            df[quarter + STD_DISTANCE] = (series - mu) / sigma
-
-        df['code'] = df.index
-        DMgr.save_csv(df, 'cluster_target', target + TRANSPOSE)
+    def fetch_all_cluster_target_stat(cls):
+        targets = {}
+        for target in Formula.key_targets:
+            df = DMgr.read_csv('cluster_target', target)
+            df.index = df.quarter
+            targets[target] = df
+        return targets
 
 
 class _Analysis:
     def __init__(self):
         # self.fetch_all_cluster_target_stat()
         pass
-
-    def fetch_all_cluster_target_stat(self):
-        targets = {}
-        for target in Formula.key_targets:
-            df = DMgr.read_csv('cluster_target', target + TRANSPOSE)
-            df.index = df.quarter
-            targets[target] = df
-        return targets
-
-    def cluster_separate_by_code(self, code, quarter = None):
-        comb = pd.DataFrame()
-        targets=self.fetch_all_cluster_target_stat()
-        for target in Formula.key_targets:
-            if quarter is None:
-                comb[target] = targets[target][code]
-            else:
-                for idx in [quarter, quarter + PERCENTILE, quarter + STD_DISTANCE]:
-                    comb.loc[idx, target] = self.targets[target].at[idx, code]
-        comb['quarter'] = comb.index
-        DMgr.save_csv(comb, 'main_select', code)
-        return comb
 
 
 Analysis = _Analysis()

@@ -259,8 +259,11 @@ def error_reshow():
 
 
 def test():
-    # Updater.all_cluster_target_stat()
-    Analysis.cluster_separate_by_code(bcode)
+    # df=DMgr.read_csv('main_select',bcode)
+    # plt_line(df[''])
+    Updater.all_target_cluster()
+    # Updater.all_cluster_separate()
+    # Analysis.cluster_separate_by_code(bcode)
     # error_reshow()
 
 

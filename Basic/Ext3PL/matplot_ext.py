@@ -6,13 +6,17 @@ mu, sigma = 100, 15
 xr = mu + sigma * np.random.randn(10000)
 
 
-def plt_hist(x, segment = 100):
-    x = x[(x == x) & (x != np.inf)]
+def plt_line(df):
+    plt.plot(df)
+    plt.show()
+
+
+def plt_hist(series, segment = 100):
+    series = series[(series == series) & (series != np.inf)]
     # the histogram of the data
-    n, bins, patches = plt.hist(x, segment, facecolor = 'green')
-    mu = x.mean()
-    sigma = x.std()
-    # print(mu,sigma)
+    n, bins, patches = plt.hist(series, segment, facecolor = 'green')
+    mu = series.mean()
+    sigma = series.std()
 
     # add a 'best fit' line
     y = mlab.normpdf(bins, mu, sigma)
@@ -25,4 +29,4 @@ def plt_hist(x, segment = 100):
     plt.grid(True)
 
     plt.show()
-    return mu,sigma
+    return mu, sigma
