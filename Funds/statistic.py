@@ -1,8 +1,6 @@
 from .formulary import *
 
-PERCENTILE = '_percentile'
-STD_DISTANCE = '_sd'
-TRANSPOSE = '_T'
+
 
 
 class Updater:
@@ -78,11 +76,18 @@ class Updater:
                         clusters[target] = pd.DataFrame(index = all_quarters)
                     clusters[target][code] = df[target]
 
+        sort_method = {
+            'max'        : lambda series: series.sort_values(ascending = True).index,
+            'min'        : lambda series: series.sort_values(ascending = False).index,
+            'minus_verse': minus_verse}
+
         def cluster_stat(target):
             df = clusters[target]
             df.dropna(axis = 0, how = 'all', inplace = True)
             percentile = pd.DataFrame(columns = df.columns + PERCENTILE)
             std_dis = pd.DataFrame(columns = df.columns + STD_DISTANCE)
+
+            func_sort_idx = sort_method[Formula.key_targets[target]]
 
             def row_normal_stat(row):
                 series = row
@@ -96,8 +101,8 @@ class Updater:
                 ids = [i for i in range(val_count)]
                 na = [np.nan for i in range(series.size - val_count)]
 
-                sorted = series.sort_values()
-                ids = pd.Series(ids + na, index = sorted.index + PERCENTILE)
+                sorted_index = func_sort_idx(series)
+                ids = pd.Series(ids + na, index = sorted_index + PERCENTILE)
                 percentile.loc[quarter] = ids / val_count
                 sd = (series - mu) / sigma
                 sd.index = series.index + STD_DISTANCE
@@ -109,7 +114,7 @@ class Updater:
             df['quarter'] = df.index
             DMgr.save_csv(df, 'cluster_target', target)
 
-        loop(cluster_stat, Formula.key_targets, num_process = 1,
+        loop(cluster_stat, list(Formula.key_targets.keys()), num_process = 7,
             flag = 'cluster_target_stat', show_seq = True)
 
     @classmethod
@@ -119,13 +124,16 @@ class Updater:
         def cluster_separate_by_code(code):
             comb = pd.DataFrame()
             for target in Formula.key_targets:
-                if code not in targets[target]:
-                    continue
-                comb[target] = targets[target][code]
+                for suf in ['', PERCENTILE, STD_DISTANCE]:
+                    source_col = code + suf
+                    dest_col = target + suf
+                    if source_col not in targets[target]:
+                        continue
+                    comb[dest_col] = targets[target][source_col]
 
             comb.dropna(axis = 0, how = 'all', inplace = True)
             comb['quarter'] = comb.index
-            DMgr.save_csv(comb, 'main_select', code)
+            DMgr.save_csv(comb, 'target_stock', code)
             # return comb
 
         DMgr.loop_stocks(cluster_separate_by_code, 'cluster_separate', show_seq = True,
@@ -143,10 +151,49 @@ class Updater:
         return targets
 
 
-class _Analysis:
-    def __init__(self):
-        # self.fetch_all_cluster_target_stat()
-        pass
+class Stat:
+    @classmethod
+    def test(cls):
+        sd_sets = {}
+        for target in ['ROE', 'ROA', 'ROC', 'ROIC', 'RNOA']:
+            mus = []
+            sds = []
+            df = DMgr.read_csv('cluster_target', target)
+            for code in DMgr.code_list:
+                if code in df:
+                    se = df[code]
+                    se = se[se == se]
+                    os = se.size
+                    se = se[(se != np.inf) & (se != -np.inf)]
+                    afs = se.size
+                    if afs != os:
+                        print(target, code, os - afs)
+                    if se.size > 3:
+                        mu = se.mean()
+                        if mu > 10:
+                            continue
+                            print(target, code, se)
+                        sd = statistics.stdev(se)
+                        if sd != sd:
+                            print(code, se)
+                        mus.append(mu)
+                        sds.append(sd)
+            # print(list)
+            sd_sets[target] = [len(mus), statistics.mean(mus), statistics.mean(sds)]
+        for key in sd_sets:
+            pNum(key, sd_sets[key])
 
 
-Analysis = _Analysis()
+class Analysis:
+    def __init__(self, code):
+        self.code = code
+        self.stat = DMgr.read_csv('main_select', code)
+
+    def plot(self):
+        cols = [x for x in self.stat if PERCENTILE in x]
+        self.stat.plot(kind = 'line', y = cols)
+        plt.show()
+
+
+class Strategy:
+    pass

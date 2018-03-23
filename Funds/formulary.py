@@ -138,16 +138,19 @@ class _FinancialFormula(metaclass = SingletonMeta):
         # get table-field relation pairs for further use, table of *_indicator excluded
         self._table_fields = {row.field: row.table for i, row in DWash.mapper.iterrows() if
                               '_in' not in row.table}
-        self.key_targets = []
 
         def _organise_table():
             table = get_lib('formula')
             factor_dict = {}
+            key_targets = {}
             table.index = table.target
 
             paras = '([A-Za-z_]\w*)'
             reg_factor = re.compile(paras)
             for target, formula in table.iterrows():
+                if formula.indicia == formula.indicia:
+                    key_targets[formula.target] = formula.indicia
+
                 fs = reg_factor.findall(formula.equation)
                 fs = [x for x in fs if x not in RESERVED_KEYWORDS]
                 # get all fields included in equation
@@ -166,12 +169,10 @@ class _FinancialFormula(metaclass = SingletonMeta):
                     else:
                         source = REPORT
                 table.ix[target, 'source'] = source
-                if formula.indicia == 'key':
-                    self.key_targets.append(formula.target)
 
-            return table, factor_dict
+            return table, factor_dict, key_targets
 
-        self.table, self.target_factors = _organise_table()
+        self.table, self.target_factors, self.key_targets = _organise_table()
 
     def table_of(self, field):
         '''return the name of the table contains field'''
@@ -184,9 +185,10 @@ class _FinancialFormula(metaclass = SingletonMeta):
         :param data: data frame used to calculate formula
         :param formula:
         :param prelude:
-        :param target_calculator:
+        :param target_calculator: callback func to get the target from upper level object
         :return: series contains formula result
         '''
+        if_debug = False
 
         def _prelude(data, formula, prelude):
             '''
@@ -198,6 +200,7 @@ class _FinancialFormula(metaclass = SingletonMeta):
             '''
             eqt = formula.equation
             fields = Formula.target_factors[formula.target]
+            if if_debug:                print(formula.target)
             # print(data[fields])
             if prelude != prelude:
                 for field in fields:
@@ -246,6 +249,7 @@ class _FinancialFormula(metaclass = SingletonMeta):
             return data[target]
         else:
             eqt, fields = _prelude(data, formula, prelude)
+            if if_debug:            print(data[fields])
             eqt_series = data.eval(eqt, parser = 'pandas')
             if formula.finale != formula.finale:
                 result = eqt_series
@@ -259,7 +263,7 @@ Formula = _FinancialFormula()
 
 
 class Ticks(object):
-    If_Renew = True
+    If_Renew = False
 
     def __init__(self, code, formula_selector, table_getter: callable, security_type: str,
                  refer_index = None):
@@ -300,7 +304,7 @@ class Ticks(object):
         self.major = pd.merge(self.report, reduced, on = 'quarter', how = 'left')
         self.major.index = self.major.quarter
 
-        def target_saved_fetch():
+        def saved_target_retrieve():
             targets = DMgr.read_csv(self.target_category, code)
             if targets is None or self.If_Renew:
                 targets = pd.DataFrame(index = self.report.index)
@@ -309,7 +313,17 @@ class Ticks(object):
                 targets.index = targets.quarter
             return targets
 
-        self.targets = target_saved_fetch()
+        self.targets = saved_target_retrieve()
+
+        def stat_retrieve():
+            stat = DMgr.read_csv('main_select', code)
+            stat.index = stat['quarter']
+            fields = []
+            for col in stat:
+                if col.endswith(PERCENTILE):
+                    fields.append(col)
+
+            return stat[fields]
 
         if self.If_Renew:
             for idx, formula in Formula.table[Formula.table.source == TICK].iterrows():
@@ -317,6 +331,9 @@ class Ticks(object):
                     self.tick = self.tick.drop(idx, axis = 1)
         else:
             self.major = pd.merge(self.major, self.targets, on = 'quarter', how = 'left')
+            stat = stat_retrieve()
+            self.major = pd.merge(self.major, stat, left_index = True, right_index = True,
+                how = 'left')
 
     def calc_all_vector(self):
         if self.NonData:
@@ -331,6 +348,8 @@ class Ticks(object):
         return self.targets
 
     def calc_target_vector(self, formula = None, target: str = None, prelude = np.nan):
+        if self.NonData:
+            return None
         if formula is None and target is None:
             raise Exception(' not specified at %s %s' % (self.type, self.code))
         if formula is not None:
@@ -381,7 +400,7 @@ class Indexs(Ticks):
     def __init__(self, label, code, ifUpdate = False):
         def __get_table():
             tick = DMgr.read_csv('index', self.code)
-            remove_duplicateI(tick)
+            column_duplicate_removeI(tick)
             for col in ['market_cap', 'circulating_market_cap', 'net_profit']:
                 if col in tick:
                     tick.drop(col, axis = 1, inplace = True)
@@ -453,7 +472,7 @@ class Stocks(Ticks):
         def __get_table():
             report = None
             for tb in ['balance', 'cash_flow', 'income']:
-                df = DMgr.read_csv(tb, self.code, if_regular = False)
+                df = DMgr.read_csv(tb, self.code)
                 if df is not None:
                     df['quarter'] = df['date'].apply(to_quarter)
                     dup = df[df['quarter'].duplicated()]
@@ -484,6 +503,14 @@ class Stocks(Ticks):
         if HS300 is None:
             HS300 = Indexs(*Idx_dict['HS300'])
         super().__init__(code, lambda target: INDEX_FLAG not in target, __get_table, 'stock', HS300)
+
+    def financial_compare(self):
+        if self.NonData:
+            return
+        self.calc_target_vector(target = 'FinanceExpense')
+        res = column_compare_chooseI(self.major, 'FinanceExpense', 'financial_expense')
+        print(res)
+        return res
 
     def RIM(self, quarter = None):
         quarter = to_quarter(now()) if quarter is None else quarter

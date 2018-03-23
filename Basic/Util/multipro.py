@@ -58,9 +58,10 @@ def loop(func, para_list, num_process = 1, flag = '', times = 1, delay = 0,
     else:
         arr_list = np.array_split(para_list, num_process)
         print(num_process, len(para_list))
-        pool = Pool()
-        outs = pool.map(_process, arr_list)
-        pool.close()
+        with Pool() as pool:
+            outs = pool.map(_process, arr_list)
+            # pool.close()
+            # pool.join()
         final_result = [r for x in outs for r in x[0]]
         failures = [f for x in outs for f in x[1]]
     if len(failures) > 0:

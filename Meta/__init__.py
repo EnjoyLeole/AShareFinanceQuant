@@ -3,29 +3,28 @@ import os
 from Basic.IO import file2obj
 
 GBK = 'gbk'
-__file_name = {
-    'mapper' : 'field_mapper.csv',
-    'formula': 'formula.csv',
-    'matched': 'matched.json'}
+
+META_DIR = os.path.dirname(os.path.abspath(__file__)) + '\\'
+DATA_ROOT = META_DIR + 'StockData\\'
+
+lib_path = {
+    'mapper' : META_DIR + 'field_mapper.csv',
+    'formula': META_DIR + 'formula.csv',
+    'matched': DATA_ROOT + 'matched.json'}
 lib = {}
 
-dir = os.path.dirname(os.path.abspath(__file__))
-DATA_ROOT = dir + '\\StockData\\'
+
+def get_lib(key):
+    global lib
+    if key not in lib:
+        lib[key] = pd.read_csv(lib_path[key], encoding = GBK)
+    return lib[key]
 
 
 def get_error_path(name):
-    return dir + '\\%s.txt' % name
-
-
-def get_lib_path(key):
-    return dir + '\\' + __file_name[key]
+    return META_DIR + '\\%s.txt' % name
 
 
 def get_error_list(name):
     path = get_error_path(name)
     return file2obj(path)
-
-
-def get_lib(key):
-    lib[key] = pd.read_csv(get_lib_path(key), encoding = GBK)
-    return lib[key]

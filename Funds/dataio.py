@@ -25,7 +25,8 @@ TICK = 'ticks_daily'
 REPORT = 'financial_report_quarterly'
 
 TTM_SUFFIX = '_ttm'
-
+PERCENTILE = '_percentile'
+STD_DISTANCE = '_sd'
 
 def get_url(url, encoding = ''):
     if encoding == '':
@@ -166,7 +167,6 @@ DMgr = _DataManager()
 
 class _DataWasher(metaclass = SingletonMeta):
     COLUMN_UPDATE = True
-    WARNING_LEVEL = 0.5
     DUPLICATE_SEPARATOR = '~'
     DUPLICATE_FLAG = '*2'
 
@@ -177,7 +177,7 @@ class _DataWasher(metaclass = SingletonMeta):
             self.mapper['matchCount'] = 0
             self.mapper['matches'] = ''
 
-        self.match_path = get_lib_path('matched')
+        self.match_path = lib_path['matched']
         if not os.path.exists(self.match_path):
             with open(self.match_path, 'w') as f:
                 f.write('{}')
@@ -186,7 +186,10 @@ class _DataWasher(metaclass = SingletonMeta):
     def raw_regularI(self, df: pd.DataFrame, category = ''):
         self.replaceI(df)
         self.value_scale_by_column_name(df)
-        self.column_regularI(df, category)
+
+        matches = self._column_match(df, category)
+        df.rename(columns = matches, inplace = True)
+        self.column_selectI(df)
 
     # region column name regular
 
@@ -241,47 +244,6 @@ class _DataWasher(metaclass = SingletonMeta):
         return matches
 
     def column_selectI(self, df):
-        rename = lambda x: df.rename(columns = x, inplace = True)
-
-        def __compareI(origin, dual_key):
-            def __chose_origin():
-                rename({
-                    dual_key: dual_key + 'Done'})
-
-            def __chose_dual():
-                rename({
-                    origin: origin + 'Done'})
-                rename({
-                    dual_key: origin})
-
-            dual = df[dual_key]
-            if isinstance(dual, pd.DataFrame):
-                raise Exception('%s has multiple columns, Should handle before!' % dual_key)
-
-            self._numericI(df, [origin, dual_key])
-            orgSum = (df[origin] != 0).sum()
-            dualSum = (df[dual_key] != 0).sum()
-            diff = orgSum - dualSum
-            maxSum = max(orgSum, dualSum)
-            diff_rate = diff / maxSum if maxSum > 0 else 0
-
-            if abs(diff_rate) < 0.001 or dualSum == 0:
-                __chose_origin()
-            elif orgSum == 0 and dualSum != 0:
-                __chose_dual()
-            else:
-                def validate(series):
-                    if series[origin] != series[dual_key] and series[origin] != 0 and series[
-                        dual_key] != 0:
-                        return 1
-                    return 0
-
-                check = df.apply(validate, axis = 1).sum()
-                if check / df.shape[0] > self.WARNING_LEVEL:
-                    print('Inconsistent for %s bigger than %s with %s in %s / %s records' % (
-                        origin, dual_key, diff_rate, check, df.shape[0]))
-                __chose_dual() if diff < 0 else __chose_origin()
-
         keys = {}
         cols_id = [[x.split(self.DUPLICATE_SEPARATOR)[0], x] for x in df.columns]
         for id, col in cols_id:
@@ -298,15 +260,7 @@ class _DataWasher(metaclass = SingletonMeta):
                     if field in df:
                         df.drop(field, axis = 1, inplace = True)
                 elif id != field:
-                    __compareI(id, field)
-
-    def column_regularI(self, df: pd.DataFrame, category = ''):
-        matches = self._column_match(df, category)
-
-        df.rename(columns = matches, inplace = True)
-
-        # print([col for col in df.columns.values if 'long_d' in col])
-        self.column_selectI(df)
+                    column_compare_chooseI(df,id, field)
 
     # endregion
 
@@ -336,24 +290,6 @@ class _DataWasher(metaclass = SingletonMeta):
     # region number & scale
     def replaceI(self, df: pd.DataFrame, old = '--', new = 0):
         df.replace(old, new, inplace = True)
-
-    def __to_num(self, val):
-        try:
-            return float(val)
-        except:
-            return 0
-
-    def _numericI(self, df: pd.DataFrame, include = [], exclude = []):
-        include = df if len(include) == 0 else include
-        include = [include] if not isinstance(include, list) else include
-        for col in include:
-            if col not in exclude and df[col].dtype in [object, str]:
-                try:
-                    df[col] = df[col].astype(np.float64)  # print('simple')
-                except Exception as e:
-                    df[col] = df[col].apply(self.__to_num)
-
-                    # print('%s has a shape %s which is incorrect! %s' % (col, df[col].shape, e))
 
     def value_scale_by_column_name(self, df: pd.DataFrame):
         for col in df:

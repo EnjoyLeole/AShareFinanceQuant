@@ -3,6 +3,7 @@ from Citics.trade import *
 from Meta import *
 from timeit import timeit
 import numpy
+import matplotlib.pyplot as plt
 
 simples = {
     'letv'  : '300104',
@@ -224,12 +225,10 @@ def numba(arr = li):
 
 # endregion
 def df_test():
-    df = DMgr.read_csv('stock_target', bcode)
-    se = df['PE']
-    se1 = se.values.reshape(1, -1)
-    print(se.shape, se1.shape)
-    # result = df.eval('log10(close)')
-    # print(result)
+    df = DMgr.read_csv('stock_target', letv)
+
+    result =minus_verse(df['PE'])
+    print(result)
 
 
 def index_target_test(code = '399300'):
@@ -238,14 +237,13 @@ def index_target_test(code = '399300'):
 
 
 def stock_vector_test(code = hr, target = None):
-    # t0 = datetime.now()
     stk = Stocks(code)
     if target is None:
         df_res = stk.calc_all_vector()
         stk.save_targets()
     else:
-        stk.calc_target_vector(target = target)
-    # print(datetime.now() - t0)
+        res = stk.calc_target_vector(target = target)
+        print(res)
 
 
 def error_reshow():
@@ -258,19 +256,40 @@ def error_reshow():
     print(res)
 
 
+def financial_expense_compare():
+    dic = {}
+    for code in DMgr.code_list:
+        stk = Stocks(code)
+        res_li = stk.financial_compare()
+        if res_li is None:
+            continue
+        print(code)
+        res = res_li[0]
+        if res not in dic:
+            dic[res] = 1
+        else:
+            dic[res] += 1
+    print(dic)
+
+
 def test():
-    # df=DMgr.read_csv('main_select',bcode)
-    # plt_line(df[''])
+    # df_test()
+    # financial_expense_compare()
+
+
+# f=lambda x:print(x)
+# loop(f,range(100),num_process = 4)
+# loop(f,range(100),num_process = 4)
+# a = Analysis(bcode)
+# a.plot()
+#     Stat.test()
+# plt_line(df['PE'])
     Updater.all_target_cluster()
-    # Updater.all_cluster_separate()
-    # Analysis.cluster_separate_by_code(bcode)
-    # error_reshow()
+    Updater.all_cluster_separate()
+# error_reshow()
 
 
 if __name__ == '__main__':
     print('start')
     print(timeit(test, number = 1))
     times = 100000
-# pNum('python', timeit(python,number=times))
-# numba()
-# pNum('numba', timeit(numba,number=times))

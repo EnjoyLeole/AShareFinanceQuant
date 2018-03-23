@@ -1,13 +1,79 @@
 import pandas as pd
+import numpy as np
 from Basic.Util.mydatetime import INTERVAL_TRANSFER
 
 DUPLICATE_FLAG = '_d'
 FORCE_FILLED = 'force_filled'
+WARNING_LEVEL = 0.5
+COMPARED_FLAG = 'Done'
 
 
-def remove_duplicateI(df):
+def column_duplicate_removeI(df):
     dups = [x for x in df if x.endswith(DUPLICATE_FLAG)]
     df.drop(dups, axis = 1, inplace = True)
+
+
+def column_compare_chooseI(df, origin, dual_key):
+    rename = lambda x: df.rename(columns = x, inplace = True)
+    winner = []
+
+    def __chose_origin():
+        rename({
+            dual_key: dual_key + COMPARED_FLAG})
+        winner.append(origin)
+
+    def __chose_dual():
+        rename({
+            origin: origin + COMPARED_FLAG})
+        rename({
+            dual_key: origin})
+        winner.append(dual_key)
+
+    dual = df[dual_key]
+    if isinstance(dual, pd.DataFrame):
+        raise Exception('%s has multiple columns, Should handle before!' % dual_key)
+
+    numericI(df, [origin, dual_key])
+    org_count = (df[origin] != 0).sum()
+    dual_count = (df[dual_key] != 0).sum()
+
+    org_sum = df[origin].apply(abs).sum()
+    dual_sum = df[dual_key].apply(abs).sum()
+    diff = org_sum - dual_sum
+    max_sum = max(org_sum, dual_sum)
+    diff_rate = diff / max_sum if max_sum > 0 else 0
+
+    if (org_count > 0 and dual_count == 0) or diff_rate < 0.001:
+        __chose_origin()
+    elif org_count == 0 and dual_count > 0:
+        __chose_dual()
+    elif org_count == dual_count:
+        if diff >= 0:
+            __chose_origin()
+        else:
+            __chose_dual()
+    else:
+        def validate(series):
+            if series[origin] != series[dual_key] and series[origin] != 0 and series[
+                dual_key] != 0:
+                return 1
+            return 0
+
+        unequal_num = df.apply(validate, axis = 1).sum()
+        if unequal_num / df.shape[0] > WARNING_LEVEL:
+            print('Inconsistent for %s bigger than %s with %s in %s / %s records' % (
+                origin, dual_key, diff_rate, unequal_num, df.shape[0]))
+
+        if org_count > dual_count:
+            if diff < 0:
+                print('Warning!org %s %s dual %s %s' % (org_count, org_sum, dual_count, dual_sum))
+            __chose_origin()
+        else:
+            if diff > 0:
+                print('Warning!org %s %s dual %s %s' % (org_count, org_sum, dual_count, dual_sum))
+            __chose_dual()
+
+    return winner
 
 
 def fill_miss(df, refer_idxs, brief_col = 'quarter', ifLabelingFilled = True):
@@ -27,7 +93,6 @@ def truncate_period(df, truncate_val, truncate_col = 'quarter'):
     df.sort_values(truncate_col, inplace = True)
     last = df.iloc[-1]
     if last[truncate_col] != truncate_val:
-
         df.loc[truncate_val, :] = last
         df.loc[truncate_val, truncate_col] = truncate_val
     return df
@@ -76,3 +141,40 @@ def brief_detail_merge(brief, detail, ifReduce2brief = False, brief_col = 'quart
     df.sort_values([brief_col, detail_col], inplace = True)
 
     return df
+
+
+def numericI(df: pd.DataFrame, include = [], exclude = []):
+    include = df if len(include) == 0 else include
+    include = [include] if not isinstance(include, list) else include
+    for col in include:
+        if col not in exclude and df[col].dtype in [object, str]:
+            try:
+                df[col] = df[col].astype(np.float64)  # print('simple')
+            except Exception as e:
+                df[col] = df[col].apply(__to_num)
+
+
+def __to_num(self, val):
+    try:
+        return float(val)
+    except:
+        return 0
+
+
+def minus_verse(series):
+    '''
+    Special series sorting method, for PE
+    positive ascending -》 negative descending -> nan
+    :param series:
+    :return:
+    '''
+    pos = series[series > 0]
+    # print(pos.index)
+    pos_idx = pos.sort_values(ascending = False).index.values
+    minus = series[series <= 0]
+    minus_idx = minus.sort_values(ascending = True).index.values
+    nan_idx = series[series != series].index.values
+    comb = np.concatenate((minus_idx, pos_idx, nan_idx))
+    se = pd.Series(index = comb)
+    # return pos_idx + minus_idx + nan_idx
+    return se.index
