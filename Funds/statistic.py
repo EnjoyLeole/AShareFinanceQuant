@@ -1,8 +1,6 @@
 from .formulary import *
 
 
-
-
 class Updater:
     @classmethod
     def everything(cls):
@@ -43,10 +41,10 @@ class Updater:
     @classmethod
     def all_target_update(cls):
         def calc(code):
-            if os.path.getmtime(DMgr.csv_path('stock_target', code)) >= datetime(2018, 3, 18, 23,
-                    0).timestamp():
-                print('%s jumped' % code)
-                return
+            # if os.path.getmtime(DMgr.csv_path('stock_target', code)) >= datetime(2018, 3, 18, 23,
+            #         0).timestamp():
+            #     print('%s jumped' % code)
+            #     return
             # print(code + ' start')
             stk = Stocks(code)
             res = stk.calc_all_vector()
@@ -75,6 +73,8 @@ class Updater:
                     if target not in clusters:
                         clusters[target] = pd.DataFrame(index = all_quarters)
                     clusters[target][code] = df[target]
+
+
 
         sort_method = {
             'max'        : lambda series: series.sort_values(ascending = True).index,

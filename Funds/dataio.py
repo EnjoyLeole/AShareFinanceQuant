@@ -28,6 +28,7 @@ TTM_SUFFIX = '_ttm'
 PERCENTILE = '_percentile'
 STD_DISTANCE = '_sd'
 
+
 def get_url(url, encoding = ''):
     if encoding == '':
         encoding = GBK
@@ -260,7 +261,7 @@ class _DataWasher(metaclass = SingletonMeta):
                     if field in df:
                         df.drop(field, axis = 1, inplace = True)
                 elif id != field:
-                    column_compare_chooseI(df,id, field)
+                    column_compare_chooseI(df, id, field)
 
     # endregion
 

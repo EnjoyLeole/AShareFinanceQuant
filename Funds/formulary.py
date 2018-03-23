@@ -317,6 +317,8 @@ class Ticks(object):
 
         def stat_retrieve():
             stat = DMgr.read_csv('main_select', code)
+            if stat is None:
+                return None
             stat.index = stat['quarter']
             fields = []
             for col in stat:
@@ -332,8 +334,10 @@ class Ticks(object):
         else:
             self.major = pd.merge(self.major, self.targets, on = 'quarter', how = 'left')
             stat = stat_retrieve()
-            self.major = pd.merge(self.major, stat, left_index = True, right_index = True,
-                how = 'left')
+            if stat is not None:
+                self.major = pd.merge(self.major, stat, left_index = True, right_index = True,
+                    how = 'left')
+            self.major.index = self.major.quarter
 
     def calc_all_vector(self):
         if self.NonData:
@@ -341,9 +345,11 @@ class Ticks(object):
         cols = []
         for i, formula in self.formulas.iterrows():
             # print('vector',i)
+            if formula.indicia == 'policy':
+                continue
             cols.append(i)
-            if formula.source != TICK:
-                self.calc_target_vector(formula)
+            # if formula.source != TICK:
+            self.calc_target_vector(formula)
         self.targets = self.major[['quarter', *cols]]
         return self.targets
 

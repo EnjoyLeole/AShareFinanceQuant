@@ -275,17 +275,10 @@ def financial_expense_compare():
 def test():
     # df_test()
     # financial_expense_compare()
-
-
-# f=lambda x:print(x)
-# loop(f,range(100),num_process = 4)
-# loop(f,range(100),num_process = 4)
-# a = Analysis(bcode)
-# a.plot()
-#     Stat.test()
-# plt_line(df['PE'])
-    Updater.all_target_cluster()
-    Updater.all_cluster_separate()
+    # stock_vector_test('300647')
+    Updater.all_target_update()
+#     Updater.all_target_cluster()
+#     Updater.all_cluster_separate()
 # error_reshow()
 
 
