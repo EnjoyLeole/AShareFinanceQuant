@@ -36,7 +36,7 @@ error_file = 'error_reshow.txt'
 
 # region web
 def all_update():
-    Updater.all_idx()
+    Updater.crawler_idx()
 
 
 def idx_hit():
@@ -70,13 +70,6 @@ def fin_test():
 
 def reform_test():
     df = DMgr.read('stock', '000001')  # DWash.reform_tick(df,'index')
-
-
-def dm_save_test():
-    df = pd.DataFrame()
-
-    print(df)
-    DMgr.save(df, 'temp', 't02', index = True)
 
 
 # endregion
@@ -238,13 +231,13 @@ def feather_test():
 
 def index_target_test(code = '399300'):
     id = Indexs('hs300', code)
-    id.calc_all()
+    id.calc_list()
 
 
 def stock_vector_test(code = hr, target = None):
     stk = Stocks(code)
     if target is None:
-        df_res = stk.calc_all()
+        df_res = stk.calc_list()
         stk.save_targets()
     else:
         res = stk.calc_target(target = target)
@@ -281,13 +274,11 @@ def financial_expense_compare():
 def test():
     # Updater.all_finance()
     # DWash.csv2feather()
-    Updater.fetch_all_cluster_target_stat()
+    # DMgr.read2dict('cluster_target',Formula.key_targets)
+    # Updater.targets_stock2cluster(Formula.polices)
     # feather_test()
-
+    DMgr.feather2csv('cluster_target','Policy')
     # stock_vector_test(bcode)
-
-
-# error_reshow()
 
 
 if __name__ == '__main__':

@@ -17,11 +17,10 @@ DATA_FOLDERS = {
     'macro'         : 'macro',
     'stock'         : 'market_stock',
     'temp'          : 'temp',
+    'category'      : 'category',
     'stock_target'  : 'target_stock',
     'index_target'  : 'target_index',
-    'category'      : 'category',
-    'cluster_target': 'cluster_target',
-    'main_select'   : 'main_select'}
+    'cluster_target': 'target_cluster'}
 TICK = 'ticks_daily'
 REPORT = 'financial_report_quarterly'
 
@@ -99,7 +98,21 @@ class _DataManager(metaclass = SingletonMeta):
         df = pd.read_feather(path)
         return df
 
+    def read2dict(self, category, code_list, df_transfer = None):
+        dic = {}
+        for code in code_list:
+            df = self.read(category, code)
+            if df_transfer is not None:
+                df = df_transfer(df)
+            dic[code] = df
+        return dic
+
     def save(self, df: pd.DataFrame, category, code, encode = GBK, index = False):
+        if df.index.name is not None:
+            if_drop = True if df.index.name in df else False
+        else:
+            if_drop = True
+        df = df.reset_index(drop = if_drop)
         path = self.feather_path(category, code)
         df.to_feather(path)
 
@@ -420,6 +433,10 @@ class _DataWasher(metaclass = SingletonMeta):
 
         pr = 'derc_close' if 'derc_close' in df else 'close'
         df['change_rate'] = df[pr].rolling(2).apply(ratio)
+
+    def idx_by_quarter(self, df):
+        df.index = df.quarter
+        return df
 
 
 DWash = _DataWasher()

@@ -12,7 +12,7 @@ Updater.everything()
 * Calculation stock indicators 计算标的指标
 
 <pre><code>stock=Stocks('000678')
-df=stock.calc_all()
+df=stock.calc_list()
 print(df)
 </pre></code>
 

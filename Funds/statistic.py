@@ -5,56 +5,49 @@ class Updater:
     @classmethod
     def everything(cls):
         # raw data fetch
-        cls.all_idx()
-        cls.all_stock()
-        cls.all_finance()
-        cls.all_macro()
-
-        # target calc
-        cls.all_target_update()
-        cls.all_target_cluster()
-        cls.all_stat_feedback()
+        cls.crawler_idx()
+        cls.crawler_stock()
+        cls.crawler_finance()
+        cls.crawler_macro()
 
     # region raw data
     @classmethod
-    def all_macro(cls):
+    def crawler_macro(cls):
         Tuget.override_macros()
         Tuget.override_margins()
         Tuget.override_shibor()
         Tuget.override_category()
 
     @classmethod
-    def all_finance(cls):
+    def crawler_finance(cls):
         DMgr.loop_stocks(N163.override_finance, 'financial_override', num_process = 12)
 
     @classmethod
-    def all_stock(cls):
+    def crawler_stock(cls):
         DMgr.loop_stocks(N163.update_stock_hist, 'stock_update', num_process = 12)
 
     @classmethod
-    def all_idx(cls):
+    def crawler_idx(cls):
         DMgr.loop_index(N163.update_idx_hist, 'index_update', num_process = 12)
 
     # endregion
 
     # region target
     @classmethod
-    def all_target_update(cls):
+    def targets_calculate(cls, target_list):
         def calc(code):
             # if os.path.getmtime(DMgr.csv_path('stock_target', code)) >= datetime(2018, 3, 18, 23,
             #         0).timestamp():
             #     print('%s jumped' % code)
             #     return
-            # print(code + ' start')
             stk = Stocks(code)
-            stk.calc_all()
+            stk.calc_list(target_list)
             stk.save_targets()
-            # print(code + ' saved')
 
         DMgr.loop_stocks(calc, 'target_calc', show_seq = True, num_process = 7)
 
     @classmethod
-    def all_target_cluster(cls):
+    def targets_stock2cluster(cls, target_list):
         all_quarters = quarter_range()
 
         sort_method = {
@@ -69,7 +62,7 @@ class Updater:
                 if df is None:
                     continue
                 df.index = df.quarter
-                for target in Formula.key_targets:
+                for target in target_list:
                     if target in df:
                         if target not in comb:
                             comb[target] = pd.DataFrame(index = all_quarters)
@@ -88,7 +81,7 @@ class Updater:
                             how = 'outer')
                 return merged
 
-            func_sort_idx = sort_method[Formula.key_targets[target]]
+            func_sort_idx = sort_method[Formula.target_trend[target]]
 
             df = combine_dict(target)
             df.dropna(axis = 0, how = 'all', inplace = True)
@@ -117,42 +110,32 @@ class Updater:
             df.apply(row_normal_stat, axis = 1)
             df = pd.merge(df, percentile, how = 'left', left_index = True, right_index = True)
             df = pd.merge(df, std_dis, how = 'left', left_index = True, right_index = True)
-            df['quarter'] = df.index
             DMgr.save(df, 'cluster_target', target)
 
         n = 7
         arr_list = np.array_split(DMgr.code_list, n)
         results = loop(combine_stocks, arr_list, flag = 'stock_target_combine', num_process = n)
 
-        loop(cluster_stat, list(Formula.key_targets.keys()), num_process = 7,
-            flag = 'cluster_target_stat')
+        m = min(len(target_list), 7)
+        loop(cluster_stat, target_list, num_process = m, flag = 'cluster_target_stat')
 
     @classmethod
-    def fetch_all_cluster_target_stat(cls):
-        targets = {}
-        for target in Formula.key_targets:
-            df = DMgr.read('cluster_target', target)
-            df.index = df.quarter
-            targets[target] = df
-        return targets
-
-    @classmethod
-    def all_stat_feedback(cls):
+    def targets_cluster2stock(cls, target_list):
         """save market-wide statistic result back to stocks' target table
         :return:
         """
 
-        targets = cls.fetch_all_cluster_target_stat()
+        target_dfs = DMgr.read('cluster_target', target_list, DWash.idx_by_quarter)
 
         def cluster_separate_by_code(code):
             comb = pd.DataFrame()
-            for target in Formula.key_targets:
+            for target in target_dfs:
                 for suf in [PERCENTILE, STD_DISTANCE]:
                     source_col = code + suf
                     dest_col = target + suf
-                    if source_col not in targets[target]:
+                    if source_col not in target_dfs[target]:
                         continue
-                    comb[dest_col] = targets[target][source_col]
+                    comb[dest_col] = target_dfs[target][source_col]
 
             comb.dropna(axis = 0, how = 'all', inplace = True)
             comb['quarter'] = comb.index
@@ -164,15 +147,6 @@ class Updater:
             num_process = 7)
 
     # endregion
-
-    @classmethod
-    def all_polices(cls):
-        def calc(code):
-            stk = Stocks(code)
-            stk.evaluate_polices()
-            stk.save_targets(if_tick = False)
-
-        DMgr.loop_stocks(calc, 'target_calc', show_seq = True, num_process = 7)
 
 
 class Stat:

@@ -1,4 +1,4 @@
-target,indicia,prelude,finale,quarter,equation,flag,source,comment
+target,trend,prelude,finale,quarter,equation,flag,source,comment
 E,,,,,2.718281828,,,
 FinanceExpense,,,,,interest_expense -interest_income+commission_expense-commission_income-exchange_income,addOnly,financial_report_quarterly,
 IC,,,,,total_assets-total_current_liability+shortterm_loan+non_current_liability_in_one_year+notes_payable,addOnly,financial_report_quarterly,资产总计 -流动负 债+应付票据 +短期借款 +一年内到期 的长负债
@@ -71,4 +71,4 @@ PFD,min,,,,1/(1+E**(-LPFD)),CHS,NotInData,
 CELast4,,,sum,4,fix_intan_other_asset_acqui_cash,,financial_report_quarterly,
 CELast16,,,sum,16,fix_intan_other_asset_acqui_cash,,financial_report_quarterly,
 CI,min,,,,3*CELast4/(CELast16-CELast4)-1,,NotInData,
-Policy,policy,,,,0.15*PE_percentile+0.15*PB_percentile+0.15*ROE_percentile+0.15*DATO_percentile+0.2*RSIZE_percentile+0.1*Rmonthly_percentile,,,
+Policy,max,,,,0.15*PE_percentile+0.15*PB_percentile+0.15*ROE_percentile+0.15*DATO_percentile+0.2*RSIZE_percentile+0.1*Rmonthly_percentile,,,

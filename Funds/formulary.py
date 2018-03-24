@@ -143,26 +143,30 @@ class _FinancialFormula(metaclass = SingletonMeta):
 
         def _organise_table():
             table = get_lib('formula')
-            factor_dict = {}
-            key_targets = {}
-
             table.index = table.target
+            factor_dict = {}
+            key_targets = []
             tick_targets = []
-            polices = []
+            policy_targets = []
+            target_trend = {}
             paras = '([A-Za-z_]\w*)'
             reg_factor = re.compile(paras)
             for target, formula in table.iterrows():
-                if formula.indicia == formula.indicia:
-                    if formula.indicia == 'policy':
-                        polices.append(target)
-                    else:
-                        key_targets[target] = formula.indicia
                 if formula.source == TICK:
                     tick_targets.append(target)
                 fs = reg_factor.findall(formula.equation)
                 fs = [x for x in fs if x not in RESERVED_KEYWORDS]
                 # get all fields included in equation
                 factor_dict[target] = list(set(fs))
+
+                if formula.trend == formula.trend:
+                    policy_flag = sum([1 for x in fs if x.endswith(PERCENTILE)])
+                    if policy_flag > 1:
+                        policy_targets.append(target)
+                    else:
+                        key_targets.append(target)
+                    target_trend[target] = formula.trend
+
                 # tables of equation's fields
                 tbs = [self._table_fields[x] for x in fs if x in self._table_fields]
                 tbs = list(set(tbs))
@@ -178,9 +182,9 @@ class _FinancialFormula(metaclass = SingletonMeta):
                         source = REPORT
                 table.ix[target, 'source'] = source
 
-            return table, factor_dict, key_targets, polices, tick_targets
+            return table, factor_dict, key_targets, policy_targets, tick_targets, target_trend
 
-        self.table, self.equation_parameters, self.key_targets, self.polices, self.tick_targets = _organise_table()
+        self.table, self.equation_parameters, self.key_targets, self.polices, self.tick_targets, self.target_trend = _organise_table()
 
         self.formula_by_type = {}
         self.formula_by_type['stock'] = self.table[
@@ -362,17 +366,15 @@ class Ticks(object):
         #         how = 'left')
         # self.major.index = self.major.quarter
 
-    def calc_all(self):
+    def calc_list(self, target_list = None):
         if self.NonData:
             return None
+
+        target_list = Formula.key_targets if target_list is None else target_list
         cols = []
-        for i, formula in self.formulas.iterrows():
-            # print('vector',i)
-            if formula.indicia == 'policy':
-                continue
-            cols.append(i)
-            # if formula.source != TICK:
-            self.calc_target(formula)
+        for target in target_list:
+            cols.append(target)
+            self.calc_target(target = target)
 
     def calc_target(self, formula = None, target: str = None, prelude = np.nan):
         if self.NonData:
@@ -423,12 +425,10 @@ class Ticks(object):
 
     def save_targets(self, if_tick = True):
         if not self.NonData:
-            targets = self.major[[*Formula.target_savings]]
-            targets = targets.reset_index()
+            targets = self.major[Formula.target_savings]
             DMgr.save(targets, self.target_category, self.code)
             if if_tick:
-                tick = self.tick.reset_index(drop = True)
-                DMgr.save(tick, self.type, self.code)
+                DMgr.save(self.tick, self.type, self.code)
 
 
 class Indexs(Ticks):
@@ -508,7 +508,6 @@ class Stocks(Ticks):
         def __get_table():
             report = None
             for tb in ['balance', 'cash_flow', 'income']:
-                print(tb)
                 df = DMgr.read(tb, self.code)
                 if df is not None:
                     df['quarter'] = df['date'].apply(to_quarter)
@@ -540,10 +539,6 @@ class Stocks(Ticks):
         if HS300 is None:
             HS300 = Indexs(*Idx_dict['HS300'])
         super().__init__(code, __get_table, 'stock', HS300)
-
-    def evaluate_polices(self):
-        for policy in Formula.polices:
-            self.calc_target(target = policy)
 
     def _financial_compare(self):
         if self.NonData:
