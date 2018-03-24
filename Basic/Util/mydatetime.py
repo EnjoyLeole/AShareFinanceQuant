@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta, date
+from datetime import date, datetime, timedelta
+
 import numpy as np
 
 DATE_SEPARATOR = '-'
@@ -57,7 +58,7 @@ def __std_date(year, month, day):
 
 
 def __parse_str(str):
-    if str != str:
+    if str != str or str is None or str == 'None':
         return None, None, None
 
     if '/' in str:

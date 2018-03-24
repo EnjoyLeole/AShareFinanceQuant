@@ -13,7 +13,7 @@ class Updater:
         # target calc
         cls.all_target_update()
         cls.all_target_cluster()
-        cls.all_cluster_separate()
+        cls.all_stat_feedback()
 
     # region raw data
     @classmethod
@@ -47,47 +47,53 @@ class Updater:
             #     return
             # print(code + ' start')
             stk = Stocks(code)
-            res = stk.calc_all_vector()
-            if res is not None:
-                stk.save_targets()
+            stk.calc_all()
+            stk.save_targets()
             # print(code + ' saved')
 
         DMgr.loop_stocks(calc, 'target_calc', show_seq = True, num_process = 7)
 
     @classmethod
     def all_target_cluster(cls):
-        clusters = {}
         all_quarters = quarter_range()
-
-        for code in DMgr.code_list:
-            print(code)
-            # if code >= '000109':
-            #     break
-
-            df = DMgr.read_csv('stock_target', code)
-            if df is None:
-                continue
-            df.index = df.quarter
-            for target in Formula.key_targets:
-                if target in df:
-                    if target not in clusters:
-                        clusters[target] = pd.DataFrame(index = all_quarters)
-                    clusters[target][code] = df[target]
-
-
 
         sort_method = {
             'max'        : lambda series: series.sort_values(ascending = True).index,
             'min'        : lambda series: series.sort_values(ascending = False).index,
             'minus_verse': minus_verse}
 
+        def combine_stocks(code_list):
+            comb = {}
+            for code in code_list:
+                df = DMgr.read('stock_target', code)
+                if df is None:
+                    continue
+                df.index = df.quarter
+                for target in Formula.key_targets:
+                    if target in df:
+                        if target not in comb:
+                            comb[target] = pd.DataFrame(index = all_quarters)
+                        comb[target][code] = df[target]
+            return comb
+
         def cluster_stat(target):
-            df = clusters[target]
+            def combine_dict(target):
+                dfs = [dic[target] for dic in results]
+                merged = None
+                for df in dfs:
+                    if merged is None:
+                        merged = df
+                    else:
+                        merged = pd.merge(merged, df, left_index = True, right_index = True,
+                            how = 'outer')
+                return merged
+
+            func_sort_idx = sort_method[Formula.key_targets[target]]
+
+            df = combine_dict(target)
             df.dropna(axis = 0, how = 'all', inplace = True)
             percentile = pd.DataFrame(columns = df.columns + PERCENTILE)
             std_dis = pd.DataFrame(columns = df.columns + STD_DISTANCE)
-
-            func_sort_idx = sort_method[Formula.key_targets[target]]
 
             def row_normal_stat(row):
                 series = row
@@ -112,19 +118,36 @@ class Updater:
             df = pd.merge(df, percentile, how = 'left', left_index = True, right_index = True)
             df = pd.merge(df, std_dis, how = 'left', left_index = True, right_index = True)
             df['quarter'] = df.index
-            DMgr.save_csv(df, 'cluster_target', target)
+            DMgr.save(df, 'cluster_target', target)
+
+        n = 7
+        arr_list = np.array_split(DMgr.code_list, n)
+        results = loop(combine_stocks, arr_list, flag = 'stock_target_combine', num_process = n)
 
         loop(cluster_stat, list(Formula.key_targets.keys()), num_process = 7,
-            flag = 'cluster_target_stat', show_seq = True)
+            flag = 'cluster_target_stat')
 
     @classmethod
-    def all_cluster_separate(cls):
+    def fetch_all_cluster_target_stat(cls):
+        targets = {}
+        for target in Formula.key_targets:
+            df = DMgr.read('cluster_target', target)
+            df.index = df.quarter
+            targets[target] = df
+        return targets
+
+    @classmethod
+    def all_stat_feedback(cls):
+        """save market-wide statistic result back to stocks' target table
+        :return:
+        """
+
         targets = cls.fetch_all_cluster_target_stat()
 
         def cluster_separate_by_code(code):
             comb = pd.DataFrame()
             for target in Formula.key_targets:
-                for suf in ['', PERCENTILE, STD_DISTANCE]:
+                for suf in [PERCENTILE, STD_DISTANCE]:
                     source_col = code + suf
                     dest_col = target + suf
                     if source_col not in targets[target]:
@@ -133,8 +156,9 @@ class Updater:
 
             comb.dropna(axis = 0, how = 'all', inplace = True)
             comb['quarter'] = comb.index
-            DMgr.save_csv(comb, 'target_stock', code)
-            # return comb
+            df = DMgr.read('stock_target', code)
+            df = pd.merge(df, comb, on = 'quarter', how = 'left')
+            DMgr.save(df, 'stock_target', code)
 
         DMgr.loop_stocks(cluster_separate_by_code, 'cluster_separate', show_seq = True,
             num_process = 7)
@@ -142,13 +166,13 @@ class Updater:
     # endregion
 
     @classmethod
-    def fetch_all_cluster_target_stat(cls):
-        targets = {}
-        for target in Formula.key_targets:
-            df = DMgr.read_csv('cluster_target', target)
-            df.index = df.quarter
-            targets[target] = df
-        return targets
+    def all_polices(cls):
+        def calc(code):
+            stk = Stocks(code)
+            stk.evaluate_polices()
+            stk.save_targets(if_tick = False)
+
+        DMgr.loop_stocks(calc, 'target_calc', show_seq = True, num_process = 7)
 
 
 class Stat:
@@ -158,7 +182,7 @@ class Stat:
         for target in ['ROE', 'ROA', 'ROC', 'ROIC', 'RNOA']:
             mus = []
             sds = []
-            df = DMgr.read_csv('cluster_target', target)
+            df = DMgr.read('cluster_target', target)
             for code in DMgr.code_list:
                 if code in df:
                     se = df[code]
@@ -187,7 +211,7 @@ class Stat:
 class Analysis:
     def __init__(self, code):
         self.code = code
-        self.stat = DMgr.read_csv('main_select', code)
+        self.stat = DMgr.read('main_select', code)
 
     def plot(self):
         cols = [x for x in self.stat if PERCENTILE in x]

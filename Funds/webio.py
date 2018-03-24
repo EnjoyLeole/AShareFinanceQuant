@@ -20,13 +20,13 @@ class N163(object):
     @classmethod
     def update_idx_hist(cls, code):
         category = 'index'
-        DMgr.update_csv(category, code,
+        DMgr.update_file(category, code,
             lambda start_year: N163.fetch_hist(code, start_year, index = True))
 
     @classmethod
     def update_stock_hist(cls, code):
         category = 'stock'
-        DMgr.update_csv(category, code,
+        DMgr.update_file(category, code,
             lambda start_year: N163.fetch_stock_combined_his(code, start_year))
 
     @classmethod
@@ -42,7 +42,7 @@ class N163(object):
             DWash.raw_regularI(df, 'raw_finance_' + cate)
             df.rename(columns = {
                 "index": "date"}, inplace = True)
-            DMgr.save_csv(df, cate, code)
+            DMgr.save(df, cate, code)
         print("%s saved" % code)
 
     @classmethod
@@ -129,17 +129,17 @@ class N163(object):
             if category == 'stock':
                 df = cls._update_stock_derc(category, code)
             else:
-                df = DMgr.read_csv(category, code)
+                df = DMgr.read(category, code)
             if df is None:
                 return
             DWash.get_changeI(df)
-            DMgr.save_csv(df, category, code)
+            DMgr.save(df, category, code)
 
         DMgr.loop(combine, list, category)
 
     @classmethod
     def _update_stock_derc(cls, category, code):
-        df = DMgr.read_csv(category, code)
+        df = DMgr.read(category, code)
         if df is None:
             return None
         df.date = df.date.apply(date_str2std)
@@ -233,7 +233,7 @@ class Tuget(object):
             'rzye'  : 'sum',
             'rqye'  : 'sum',
             'rzrqye': 'sum'})
-        DMgr.save_csv(mar, 'macro', 'margin', index = True)
+        DMgr.save(mar, 'macro', 'margin', index = True)
 
     @classmethod
     def override_shibor(cls):
@@ -245,7 +245,7 @@ class Tuget(object):
                 break
             shibor = pd.concat([shibor, tp])
             start += 1
-        DMgr.save_csv(shibor, 'macro', 'shibor')
+        DMgr.save(shibor, 'macro', 'shibor')
 
     @classmethod
     def override_macros(cls):
@@ -272,7 +272,7 @@ class Tuget(object):
             except Exception as e:
                 print(e)
                 break
-        DMgr.save_csv(sd, 'macro', 'share_div')
+        DMgr.save(sd, 'macro', 'share_div')
 
     @classmethod
     def fetch_code_list(cls):
@@ -417,12 +417,12 @@ class Tuget(object):
         for element in myDict:
             method = getattr(ts, myDict[element])
             df = method()
-            DMgr.save_csv(df, name, element)
+            DMgr.save(df, name, element)
 
     @classmethod
     def _money_supply_month_clean(cls):
         id = ['macro', 'money_supply']
-        m2 = DMgr.read_csv(*id)
+        m2 = DMgr.read(*id)
         last = ''
         for key, row in m2.iterrows():
             year, month = str(row['month']).split('.')
@@ -434,7 +434,7 @@ class Tuget(object):
             m2.ix[key, 'month'] = year + '-' + month
 
         print(m2['month'])
-        DMgr.save_csv(m2, *id)
+        DMgr.save(m2, *id)
 
 
 class Yahoo(object):

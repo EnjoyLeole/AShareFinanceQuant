@@ -1,10 +1,12 @@
-import time
 import os
+import time
+
 import numpy as np
-from Basic.IO import obj2file
 from pathos.multiprocessing import ProcessingPool as Pool
 
-DEBUG = True
+from Basic.IO import obj2file
+
+DEBUG = False
 
 MULTIPROCESS_FAILURE_FILE = lambda flag: 'D:/%s.txt' % flag
 
@@ -15,7 +17,7 @@ def put_failure_path(func):
 
 
 def loop(func, para_list, num_process = 1, flag = '', times = 1, delay = 0,
-         show_seq = False, limit = -1, if_debug = False):
+         show_seq = True, limit = -1, if_debug = False):
     if_debug = if_debug if if_debug else DEBUG
 
     def _process(arr):
@@ -27,28 +29,27 @@ def loop(func, para_list, num_process = 1, flag = '', times = 1, delay = 0,
             if show_seq:
                 print(pid, count, flag, para)
                 count += 1
-            for i in range(times):
-                res = None
+
+            def get_val(i):
                 if if_debug:
-                    res = func(para)
-                    break
+                    return func(para)
                 else:
                     try:
-                        res = func(para)
-                        break
+                        return func(para)
                     except TimeoutError as e:
                         if i == times - 1:
                             print(e)
                             fails.append([flag, para])
-                        if delay > 0:
-                            time.sleep(delay)
+                        else:
+                            if delay > 0:  time.sleep(delay)
+                            return get_val(i + 1)
                     except Exception as e:
                         print(e)
                         fails.append([flag, para])
-                        break
-                if res is not None:
-                    result.append(res)
 
+            res = get_val(0)
+            if res is not None:
+                result.append(res)
         return result, fails
 
     if limit > 0:

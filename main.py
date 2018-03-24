@@ -1,9 +1,9 @@
-from Funds.statistic import *
-from Citics.trade import *
-from Meta import *
 from timeit import timeit
+
 import numpy
-import matplotlib.pyplot as plt
+
+from Funds.statistic import *
+from Meta import *
 
 simples = {
     'letv'  : '300104',
@@ -61,7 +61,7 @@ def derc_test():
 def fin_test():
     code = "agg_profit"
     cate = "temp"
-    df = DMgr.read_csv(cate, code)
+    df = DMgr.read(cate, code)
     # self.mapper.to_csv("d:/test.csv")
 
     df = DWash.quarter_ttm(df, 'net_profit')
@@ -69,14 +69,14 @@ def fin_test():
 
 
 def reform_test():
-    df = DMgr.read_csv('stock', '000001')  # DWash.reform_tick(df,'index')
+    df = DMgr.read('stock', '000001')  # DWash.reform_tick(df,'index')
 
 
 def dm_save_test():
     df = pd.DataFrame()
 
     print(df)
-    DMgr.save_csv(df, 'temp', 't02', index = True)
+    DMgr.save(df, 'temp', 't02', index = True)
 
 
 # endregion
@@ -170,8 +170,8 @@ def reg_resolve_test(formula):
 
 # region formula
 def quarter_date_merge_test():
-    quart = DMgr.read_csv('balance', code)
-    dat = DMgr.read_csv('stock', code)
+    quart = DMgr.read('balance', code)
+    dat = DMgr.read('stock', code)
     # d1 = brief_detail_merge(quart, dat, ifReduce2brief = True)
     # d2 = brief_detail_merge(quart, dat, ifReduce2brief = False)
     # qddate=quart[['date','quarter']]
@@ -224,25 +224,31 @@ def numba(arr = li):
 
 
 # endregion
-def df_test():
-    df = DMgr.read_csv('stock_target', letv)
 
-    result =minus_verse(df['PE'])
-    print(result)
+def df_test():
+    df = DMgr.read('stock', letv)
+    df.to_csv(path)
+
+
+def feather_test():
+    df = DMgr.read('stock_target', '002004')
+    df.index = df.quarter
+    DMgr.save(df, 'temp', 'test_feather')
 
 
 def index_target_test(code = '399300'):
     id = Indexs('hs300', code)
-    id.calc_all_vector()
+    id.calc_all()
 
 
 def stock_vector_test(code = hr, target = None):
     stk = Stocks(code)
     if target is None:
-        df_res = stk.calc_all_vector()
+        df_res = stk.calc_all()
         stk.save_targets()
     else:
-        res = stk.calc_target_vector(target = target)
+        res = stk.calc_target(target = target)
+        stk.save_targets()
         print(res)
 
 
@@ -260,7 +266,7 @@ def financial_expense_compare():
     dic = {}
     for code in DMgr.code_list:
         stk = Stocks(code)
-        res_li = stk.financial_compare()
+        res_li = stk._financial_compare()
         if res_li is None:
             continue
         print(code)
@@ -273,16 +279,20 @@ def financial_expense_compare():
 
 
 def test():
-    # df_test()
-    # financial_expense_compare()
-    # stock_vector_test('300647')
-    Updater.all_target_update()
-#     Updater.all_target_cluster()
-#     Updater.all_cluster_separate()
+    # Updater.all_finance()
+    # DWash.csv2feather()
+    Updater.fetch_all_cluster_target_stat()
+    # feather_test()
+
+    # stock_vector_test(bcode)
+
+
 # error_reshow()
 
 
 if __name__ == '__main__':
     print('start')
     print(timeit(test, number = 1))
-    times = 100000
+    times = 100
+    # print(timeit(df_test, number = times))
+    # print(timeit(feather_test, number = times))

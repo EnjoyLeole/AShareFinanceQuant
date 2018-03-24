@@ -1,10 +1,11 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 from Basic.Util.mydatetime import INTERVAL_TRANSFER
 
 DUPLICATE_FLAG = '_d'
 FORCE_FILLED = 'force_filled'
-WARNING_LEVEL = 0.5
+WARNING_LEVEL = 1
 COMPARED_FLAG = 'Done'
 
 
@@ -113,10 +114,11 @@ def reduce2brief(df, brief_col = 'quarter', detail_col = 'date'):
 
 def brief_detail_merge(brief, detail, ifReduce2brief = False, brief_col = 'quarter',
                        detail_col = 'date'):
-    '''将周期不同的两张表做合并，在两表的index不完全重合时，会使用相邻项进行填充
+    """将周期不同的两张表做合并，在两表的index不完全重合时，会使用相邻项进行填充
     :param ifReduce2brief
         True:以汇总表为基础合并，明细表中取detail_col最大项
-        False：以明细表为基础合并，汇总表分散对应至明细表中各个brief_col的相同项'''
+        False：以明细表为基础合并，汇总表分散对应至明细表中各个brief_col的相同项
+    """
     detail2brief_func = INTERVAL_TRANSFER[(detail_col, brief_col)]
     if brief_col not in detail:
         detail[brief_col] = detail[detail_col].apply(detail2brief_func)
@@ -154,7 +156,7 @@ def numericI(df: pd.DataFrame, include = [], exclude = []):
                 df[col] = df[col].apply(__to_num)
 
 
-def __to_num(self, val):
+def __to_num( val):
     try:
         return float(val)
     except:
@@ -162,12 +164,11 @@ def __to_num(self, val):
 
 
 def minus_verse(series):
-    '''
-    Special series sorting method, for PE
+    """ Special series sorting method, for PE
     positive ascending -》 negative descending -> nan
     :param series:
     :return:
-    '''
+    """
     pos = series[series > 0]
     # print(pos.index)
     pos_idx = pos.sort_values(ascending = False).index.values

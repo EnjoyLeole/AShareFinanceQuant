@@ -1,17 +1,11 @@
 #  -*- coding:utf-8 -*-  
-import sys
-import platform
-import os
-import datetime
 import ast
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-from matplotlib.widgets import Button, RadioButtons
-import pandas as pd
-import random
-from .database import MySqlHandler
+import os
+import platform
+import sys
 
-my_folder = ["D:\\Hui Lei\\OS_Autoplan", "D:\\Hui Lei\\VueJsSite\\src", "D:\\Downloads\\Cad-master\\"]
+my_folder = ["D:\\Hui Lei\\OS_Autoplan", "D:\\Hui Lei\\VueJsSite\\src",
+             "D:\\Downloads\\Cad-master\\"]
 
 
 def filename_csv(series):
@@ -26,6 +20,11 @@ def ext(file):
     return file.split('.')[-1]
 
 
+def change_ext(file_name, new_ext):
+    f, ext = file_name.split('.')
+    return f + '.' + new_ext
+
+
 @property
 def ON_WINDOWS():
     if platform.system() == "Windows":
@@ -37,8 +36,9 @@ def ON_WINDOWS():
 def get_desktop():
     if ON_WINDOWS:
         import winreg
+
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                             'Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders', )
+            'Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders', )
         return winreg.QueryValueEx(key, "Desktop")[0]
     else:
         return ""
@@ -74,7 +74,8 @@ def get_project_files(dir):
         if root.startswith(dir + os.sep + 'ext\editor'):
             continue
         for file in files:
-            if file in ['PHPExcel.php', 'jquery-1.5.2.js', 'jquery-ui.js', 'jquery-ui.css', 'timer.js']:
+            if file in ['PHPExcel.php', 'jquery-1.5.2.js', 'jquery-ui.js', 'jquery-ui.css',
+                        'timer.js']:
                 continue
             if file.__contains__("Designer.cs"):
                 continue

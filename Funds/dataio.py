@@ -1,9 +1,10 @@
-from Meta import *
-from Basic import *
-import os, re
-import numpy as np
-import pandas as pd
+import re
+
 from urllib3 import PoolManager
+
+from Basic import *
+from Basic.IO.file import get_direct_files
+from Meta import *
 
 OLDEST_DATE = '1988-01-01'
 
@@ -46,12 +47,12 @@ def code2symbol(code):
 
 
 class _DataManager(metaclass = SingletonMeta):
-    cl_path = DATA_ROOT + 'code_list.csv'
+    code_list_path = DATA_ROOT + 'code_list.csv'
 
     def __init__(self):
         put_failure_path(get_error_path)
         self._create_all_folders()
-        self.code_table = pd.read_csv(self.cl_path, encoding = GBK)
+        self.code_table = pd.read_csv(self.code_list_path, encoding = GBK)
         self.active_table = self.code_table[self.code_table.stop == False]
         self.code_list = self.code_table['code']
         folder = DATA_ROOT + DATA_FOLDERS['index']
@@ -64,7 +65,7 @@ class _DataManager(metaclass = SingletonMeta):
 
     def __financial_report_sustaining_check(self):
         def __if_stop(code):
-            df = DMgr.read_csv('balance', code)
+            df = DMgr.read('balance', code)
             if df is not None and df.shape[0] > 0:
                 df['quarter'] = df.date.apply(to_quarter)
                 cur_quarter = to_quarter()
@@ -75,7 +76,7 @@ class _DataManager(metaclass = SingletonMeta):
             return True
 
         DMgr.code_table['stop'] = DMgr.code_table.code.apply(__if_stop)
-        DMgr.code_table.to_csv(DMgr.cl_path, encoding = GBK, index = False)
+        DMgr.code_table.to_csv(DMgr.code_list_path, encoding = GBK, index = False)
 
     def _create_all_folders(self):
         for key in DATA_FOLDERS:
@@ -87,22 +88,26 @@ class _DataManager(metaclass = SingletonMeta):
         folder = DATA_ROOT + DATA_FOLDERS[category] + '\\'
         return folder + '%s.csv' % code
 
-    def read_csv(self, category, code):
-        path = self.csv_path(category, code)
+    def feather_path(self, category, code):
+        folder = DATA_ROOT + DATA_FOLDERS[category] + '\\'
+        return folder + '%s.feather' % code
+
+    def read(self, category, code):
+        path = self.feather_path(category, code)
         if not os.path.exists(path):
             return None
-        df = pd.read_csv(path, encoding = GBK)
+        df = pd.read_feather(path)
         return df
 
-    def save_csv(self, df: pd.DataFrame, category, code, encode = GBK, index = False):
-        path = self.csv_path(category, code)
-        df.to_csv(path, index = index, encoding = encode)
+    def save(self, df: pd.DataFrame, category, code, encode = GBK, index = False):
+        path = self.feather_path(category, code)
+        df.to_feather(path)
 
-    def update_csv(self, category, code, fetcher, index = 'date'):
+    def update_file(self, category, code, fetcher, index = 'date'):
         def __msg(*txt):
             print(category, code, *txt)
 
-        exist = DMgr.read_csv(category, code)
+        exist = DMgr.read(category, code)
         # DWash.reform_tick(exist)
         if exist is None:
             exist = pd.DataFrame()
@@ -133,15 +138,17 @@ class _DataManager(metaclass = SingletonMeta):
         else:
             __msg(start, len(new))
             new = pd.concat([exist, new])
-            DMgr.save_csv(new, category, code)
+            DMgr.save(new, category, code)
             return new
 
-    def loop_stocks(self, func, flag, show_seq = False, num_process = 4, limit = -1):
-        loop(func, self.code_list, num_process = num_process, flag = flag, show_seq = show_seq,
+    def loop_stocks(self, func, flag, show_seq = True, num_process = 4, limit = -1):
+        return loop(func, self.code_list, num_process = num_process, flag = flag,
+            show_seq = show_seq,
             limit = limit)
 
-    def loop_index(self, func, flag, show_seq = False, num_process = 4, limit = -1):
-        loop(func, self.idx_list, num_process = num_process, flag = flag, show_seq = show_seq,
+    def loop_index(self, func, flag, show_seq = True, num_process = 4, limit = -1):
+        return loop(func, self.idx_list, num_process = num_process, flag = flag,
+            show_seq = show_seq,
             limit = limit)
 
     def category_concat(self, code_list, category, columns, start_date, show_seq = False):
@@ -149,7 +156,7 @@ class _DataManager(metaclass = SingletonMeta):
         setattr(self, tid, pd.DataFrame())
 
         def _concat_code(code):
-            df = self.read_csv(category, code)
+            df = self.read(category, code)
             if df is not None:
                 df = df[df.date >= start_date]
                 if df.shape[0] > 0:
@@ -161,6 +168,31 @@ class _DataManager(metaclass = SingletonMeta):
         loop(_concat_code, code_list, tid, show_seq = show_seq)
 
         return getattr(self, tid)
+
+    def all_csv2feather(self):
+        for key in DATA_FOLDERS:
+            folder = DATA_ROOT + DATA_FOLDERS[key] + '\\'
+            files = get_direct_files(folder)
+            for file in files:
+                if ext(file) != 'csv':
+                    continue
+                # print(folder,len(files))
+
+    def csv2feather(self, category, code):
+        file = self.csv_path(category, code)
+        new_file = self.feather_path(category, code)
+        print(category, code, file, new_file)
+        df = pd.read_csv(file, encoding = GBK)
+        if df is None or df.shape[0] == 0: return
+        df.to_feather(new_file)
+
+    def feather2csv(self, category, code):
+        new_file = self.csv_path(category, code)
+        file = self.feather_path(category, code)
+        print(category, code, file, new_file)
+        df = pd.read_feather(file)
+        if df is None or df.shape[0] == 0: return
+        df.to_csv(new_file, index = False, encoding = GBK)
 
 
 DMgr = _DataManager()
@@ -230,7 +262,7 @@ class _DataWasher(metaclass = SingletonMeta):
                 else:
                     judge = col == self.mapper['field']
                     if self.mapper[judge].shape[0] == 0:
-                        print(category, col_name)
+                        print(category, col_name, 'column has no match')
 
             duplicate = {}
             for col in matches:
@@ -295,13 +327,13 @@ class _DataWasher(metaclass = SingletonMeta):
     def value_scale_by_column_name(self, df: pd.DataFrame):
         for col in df:
             if '万元' in col:
-                self._numericI(df, col)
+                numericI(df, col)
                 df[col] *= 10000
             elif '率' in col or '%' in col:
-                self._numericI(df, col)
+                numericI(df, col)
                 df[col] /= 100
             elif '元' in col:
-                self._numericI(df, col)
+                numericI(df, col)
 
     def percentage_factor_by_values(self, series: pd.Series):
         series.dropna(inplace = True)
