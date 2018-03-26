@@ -1,4 +1,4 @@
-class classproperty(object):
+class ClassProperty(object):
     def __init__(self, f):
         self.f = f
 
@@ -7,21 +7,21 @@ class classproperty(object):
 
 
 def convert(obj):
-    '''convert obj to arr or dict'''
+    """convert obj to arr or dict"""
     is_list = obj.__class__ == [].__class__
     is_set = obj.__class__ == set().__class__
 
     if is_list or is_set:
         obj_arr = []
         for o in obj:
-            dict = {}
-            dict.update(o.__dict__)
-            obj_arr.append(dict)
+            dic = {}
+            dic.update(o.__dict__)
+            obj_arr.append(dic)
         return obj_arr
     else:
-        dict = {}
-        dict.update(obj.__dict__)
-        return dict
+        dic = {}
+        dic.update(obj.__dict__)
+        return dic
 
 
 class Singleton(object):
@@ -29,7 +29,7 @@ class Singleton(object):
 
     def __new__(cls, *args, **kw):
         if not cls._instance:
-            cls._instance = super(Singleton, cls).__new__(cls, *args, **kw)
+            cls._instance = super(Singleton, cls).__new__(cls)
         return cls._instance
 
 

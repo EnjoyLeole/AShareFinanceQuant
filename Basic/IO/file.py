@@ -9,7 +9,7 @@ my_folder = ["D:\\Hui Lei\\OS_Autoplan", "D:\\Hui Lei\\VueJsSite\\src",
 
 
 def filename_csv(series):
-    """Path of storaging file
+    """Path of storage file
     :param series: 文件序号
     """
     store_path = 'D:/%s.csv'
@@ -21,12 +21,12 @@ def ext(file):
 
 
 def change_ext(file_name, new_ext):
-    f, ext = file_name.split('.')
+    f, _ = file_name.split('.')
     return f + '.' + new_ext
 
 
 @property
-def ON_WINDOWS():
+def on_windows():
     if platform.system() == "Windows":
         return True
     else:
@@ -34,11 +34,11 @@ def ON_WINDOWS():
 
 
 def get_desktop():
-    if ON_WINDOWS:
+    if on_windows:
         import winreg
 
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-            'Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders', )
+                             'Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders', )
         return winreg.QueryValueEx(key, "Desktop")[0]
     else:
         return ""
@@ -54,12 +54,12 @@ def cur_dir():
         return os.path.dirname(path)
 
 
-def get_direct_files(dir):
-    return os.listdir(dir)
+def get_direct_files(folder):
+    return os.listdir(folder)
 
 
-def get_project_files(dir):
-    for root, dirs, files in os.walk(dir):
+def get_project_files(folder):
+    for root, dirs, files in os.walk(folder):
         # print(files)
         if root.__contains__("packages"):
             continue
@@ -67,11 +67,11 @@ def get_project_files(dir):
             continue
         if root.__contains__("ObjectScriptingExtensions"):
             continue
-        if root.startswith(dir + os.sep + 'adodb5'):
+        if root.startswith(folder + os.sep + 'adodb5'):
             continue
-        if root.startswith(dir + os.sep + 'core\PHPExcel'):
+        if root.startswith(folder + os.sep + 'core\PHPExcel'):
             continue
-        if root.startswith(dir + os.sep + 'ext\editor'):
+        if root.startswith(folder + os.sep + 'ext\editor'):
             continue
         for file in files:
             if file in ['PHPExcel.php', 'jquery-1.5.2.js', 'jquery-ui.js', 'jquery-ui.css',
@@ -81,15 +81,15 @@ def get_project_files(dir):
                 continue
             if file.__contains__("Temporary"):
                 continue
-            ext = file.split('.')
-            ext = ext[-1]
-            if ext in ['php', 'css', 'js', 'html', 'py', 'cs', 'rb', 'vue']:
+            extension = file.split('.')
+            extension = extension[-1]
+            if extension in ['php', 'css', 'js', 'html', 'py', 'cs', 'rb', 'vue']:
                 it_path = root + os.sep + file
                 # print(it_path)
                 yield it_path
 
 
-def get_project_lines(dir, idx = -1):
+def get_project_lines(folder, idx = -1):
     def fileline(f_path):
         res = 0
         f = open(f_path, "r", 1, "utf8")
@@ -101,10 +101,10 @@ def get_project_lines(dir, idx = -1):
     all_line = 0
     allfiles = 0
 
-    if dir is None and idx > -1:
-        dir = my_folder[idx]
+    if folder is None and idx > -1:
+        folder = my_folder[idx]
 
-    for file in get_project_files(dir):
+    for file in get_project_files(folder):
         allfiles += 1
         cur_lines = fileline(file)
         all_line += cur_lines
@@ -113,17 +113,17 @@ def get_project_lines(dir, idx = -1):
     return all_line, allfiles
 
 
-def combine2one(dir, outfile):
+def combine2one(folder, outfile):
     """ Delete blanklines of infile """
-    outfp = open(outfile, "w", encoding = "gb18030", errors = "ignore")
-    for file in get_project_files(dir):
-        infp = open(file, "r", encoding = "gb18030", errors = "ignore")
-        lines = infp.readlines()
+    out_fp = open(outfile, "w", encoding = "gb18030", errors = "ignore")
+    for file in get_project_files(folder):
+        in_fp = open(file, "r", encoding = "gb18030", errors = "ignore")
+        lines = in_fp.readlines()
         for li in lines:
             if li.split():
-                outfp.writelines(li)
-                infp.close()
-    outfp.close()
+                out_fp.writelines(li)
+                in_fp.close()
+    out_fp.close()
 
 
 def matrix2csv(path, matrix):
@@ -131,9 +131,9 @@ def matrix2csv(path, matrix):
         list2csv(path, row)
 
 
-def list2csv(path, list):
+def list2csv(path, list_values):
     with open(path, 'w') as file:
-        for element in list:
+        for element in list_values:
             file.write('%s,' % element)
         file.write('\n')
 
@@ -152,13 +152,15 @@ def file2obj(path):
 
 
 class CodeLines:
+    path_cad = ''
+
     @classmethod
     def mine(cls):
         all_line = 0
         allfiles = 0
 
-        for path in (cls.path_cad):
-            temp = cls.get_project_lines(path)
+        for path in cls.path_cad:
+            temp = get_project_lines(path)
             all_line += temp[0]
             allfiles += temp[1]
         print('Total lines:', all_line)

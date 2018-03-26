@@ -6,10 +6,10 @@ DATE_SEPARATOR = '-'
 QUARTER_SEPARATOR = 'Q'
 
 INTERVAL_ORDER = {
-    'year'   : 0,
+    'year':    0,
     'quarter': 1,
-    'month'  : 2,
-    'date'   : 3}
+    'month':   2,
+    'date':    3}
 
 
 def today():
@@ -24,30 +24,30 @@ def date_of(year, month, day):
     return datetime(year, month, day).date()
 
 
-def str2date(str, day_delta = 0):
-    if '-' in str:
+def str2date(str_date, day_delta = 0):
+    if '-' in str_date:
         reg = '%Y-%m-%d'
-    elif '/' in str:
+    elif '/' in str_date:
         reg = '%Y/%m/%d'
     else:
         reg = '%Y%m%d'
     try:
-        date = datetime.strptime(str, reg)
-        date += timedelta(days = day_delta)
+        dt = datetime.strptime(str_date, reg)
+        dt += timedelta(days = day_delta)
     except Exception as e:
-        if not 'Unnamed' in str and str != ' ':
-            print(str, e)
-        date = None
-    return date
+        if 'Unnamed' not in str_date and str_date != ' ':
+            print(str_date, e)
+        dt = None
+    return dt
 
 
-def date2str(date):
-    y, m, d = __parse_date(date)
+def date2str(date_in):
+    y, m, d = __parse_date(date_in)
     return __std_date(y, m, d)
 
 
-def date_str2std(str):
-    year, m, d = __parse_str(str)
+def date_str2std(str_date):
+    year, m, d = __parse_str(str_date)
     return __std_date(year, m, d)
 
 
@@ -57,24 +57,24 @@ def __std_date(year, month, day):
     return '%s%s%s%s%s' % (year, DATE_SEPARATOR, month, DATE_SEPARATOR, day)
 
 
-def __parse_str(str):
-    if str != str or str is None or str == 'None':
+def __parse_str(str_date):
+    if str_date != str_date or str_date is None or str_date == 'None':
         return None, None, None
 
-    if '/' in str:
+    if '/' in str_date:
         sep = '/'
-    elif '--' in str:
+    elif '--' in str_date:
         sep = '--'
-    elif '-' in str:
+    elif '-' in str_date:
         sep = '-'
     else:
         sep = None
     if sep is not None:
-        year, m, d = str.split(sep)
-    elif len(str) == 8:
-        year = str[0:4]
-        m = str[4:6]
-        d = str[6:]
+        year, m, d = str_date.split(sep)
+    elif len(str_date) == 8:
+        year = str_date[0:4]
+        m = str_date[4:6]
+        d = str_date[6:]
     else:
         return None, None, None
     # print(str)
@@ -113,8 +113,7 @@ def to_quarter(date_str = 'non-give'):
     # assert isinstance(date_str, str)
     year, month, day = __parse_date(date_str)
     month_quarters = [['03', QUARTER_SEPARATOR + '1'], ['06', QUARTER_SEPARATOR + '2'],
-                      ['09', QUARTER_SEPARATOR + '3'],
-                      ['12', QUARTER_SEPARATOR + '4']]
+                      ['09', QUARTER_SEPARATOR + '3'], ['12', QUARTER_SEPARATOR + '4']]
 
     if year is None:
         return None
@@ -143,6 +142,7 @@ def quarter2year(quarter):
 
 
 def month2quarter(month):
+    sep = '-'
     for note in ['.', '-', '/']:
         if note in month:
             sep = note
@@ -165,11 +165,11 @@ def quarter_dates(quarter):
 
 
 INTERVAL_TRANSFER = {
-    ('quarter', 'year') : quarter2year,
+    ('quarter', 'year'):  quarter2year,
     ('month', 'quarter'): month2quarter,
-    ('date', 'year')    : to_year,
-    ('date', 'quarter') : to_quarter,
-    ('date', 'month')   : to_month}
+    ('date', 'year'):     to_year,
+    ('date', 'quarter'):  to_quarter,
+    ('date', 'month'):    to_month}
 
 
 def quarter_add(quarter, i):
@@ -190,11 +190,11 @@ def quarter_add(quarter, i):
 def quarter_range(start_year = 1988, end_year = None):
     if end_year is None:
         end_year = today().year
-    list = []
+    li = []
     for year in range(start_year, end_year + 1):
         for quarter in range(1, 5):
-            list.append('%s%s%s' % (year, QUARTER_SEPARATOR, quarter))
-    return list
+            li.append('%s%s%s' % (year, QUARTER_SEPARATOR, quarter))
+    return li
 
 
 class Quarter(object):
@@ -218,11 +218,11 @@ class Quarter(object):
 
     @property
     def if_exceed_current_quarter(self):
-        now = datetime.now()
-        now_q = (now.month / 4)
-        if self.year > now.year:
+        now_time = datetime.now()
+        now_q = (now_time.month / 4)
+        if self.year > now_time.year:
             return True
-        elif self.year == now.year and self.quarter > now_q:
+        elif self.year == now_time.year and self.quarter > now_q:
             return True
         else:
             return False

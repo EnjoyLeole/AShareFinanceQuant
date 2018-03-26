@@ -8,22 +8,8 @@ from Meta import *
 
 OLDEST_DATE = '1988-01-01'
 
-DATA_FOLDERS = {
-    'indicator'     : 'financial_indicator',
-    'balance'       : 'financial_balance',
-    'cash_flow'     : 'financial_cash_flow',
-    'income'        : 'financial_income',
-    'index'         : 'market_index',
-    'macro'         : 'macro',
-    'stock'         : 'market_stock',
-    'temp'          : 'temp',
-    'category'      : 'category',
-    'stock_target'  : 'target_stock',
-    'index_target'  : 'target_index',
-    'cluster_target': 'target_cluster'}
 TICK = 'ticks_daily'
 REPORT = 'financial_report_quarterly'
-
 TTM_SUFFIX = '_ttm'
 PERCENTILE = '_percentile'
 STD_DISTANCE = '_sd'
@@ -46,23 +32,37 @@ def code2symbol(code):
 
 
 class _DataManager(metaclass = SingletonMeta):
-    code_list_path = DATA_ROOT + 'code_list.csv'
+    CODE_LIST_PATH = DATA_ROOT + 'code_list.csv'
+    DATA_FOLDERS = {
+        'indicator':      'financial_indicator',
+        'balance':        'financial_balance',
+        'cash_flow':      'financial_cash_flow',
+        'income':         'financial_income',
+        'index':          'market_index',
+        'macro':          'macro',
+        'stock':          'market_stock',
+        'temp':           'temp',
+        'category':       'category',
+        'stock_target':   'target_stock',
+        'index_target':   'target_index',
+        'cluster_target': 'target_cluster'}
 
     def __init__(self):
         put_failure_path(get_error_path)
         self._create_all_folders()
-        self.code_table = pd.read_csv(self.code_list_path, encoding = GBK)
+        self.code_table = pd.read_csv(self.CODE_LIST_PATH, encoding = GBK)
         self.active_table = self.code_table[self.code_table.stop == False]
         self.code_list = self.code_table['code']
-        folder = DATA_ROOT + DATA_FOLDERS['index']
+        folder = DATA_ROOT + self.DATA_FOLDERS['index']
         codes = re.compile('(\d+)')
         self.idx_list = []
-        for file in os.listdir(folder):
+        for file_name in os.listdir(folder):
             # print(1)
-            code = codes.search(file)[0]
+            code = codes.search(file_name)[0]
             self.idx_list.append(code)
 
-    def __financial_report_sustaining_check(self):
+    @staticmethod
+    def __financial_report_sustaining_check():
         def __if_stop(code):
             df = DMgr.read('balance', code)
             if df is not None and df.shape[0] > 0:
@@ -70,25 +70,25 @@ class _DataManager(metaclass = SingletonMeta):
                 cur_quarter = to_quarter()
                 for i in range(4):
                     qt = quarter_add(cur_quarter, -i - 1)
-                    if (df.quarter == qt).any():
+                    if np.any(df.quarter == qt):
                         return False
             return True
 
         DMgr.code_table['stop'] = DMgr.code_table.code.apply(__if_stop)
-        DMgr.code_table.to_csv(DMgr.code_list_path, encoding = GBK, index = False)
+        DMgr.code_table.to_csv(DMgr.CODE_LIST_PATH, encoding = GBK, index = False)
 
     def _create_all_folders(self):
-        for key in DATA_FOLDERS:
-            folder = DATA_ROOT + DATA_FOLDERS[key]
+        for key in self.DATA_FOLDERS:
+            folder = DATA_ROOT + self.DATA_FOLDERS[key]
             if not os.path.exists(folder):
                 os.makedirs(folder)
 
     def csv_path(self, category, code):
-        folder = DATA_ROOT + DATA_FOLDERS[category] + '\\'
+        folder = DATA_ROOT + self.DATA_FOLDERS[category] + '\\'
         return folder + '%s.csv' % code
 
     def feather_path(self, category, code):
-        folder = DATA_ROOT + DATA_FOLDERS[category] + '\\'
+        folder = DATA_ROOT + self.DATA_FOLDERS[category] + '\\'
         return folder + '%s.feather' % code
 
     def read(self, category, code):
@@ -108,6 +108,7 @@ class _DataManager(metaclass = SingletonMeta):
         return dic
 
     def save(self, df: pd.DataFrame, category, code, encode = GBK, index = False):
+        _ = encode, index
         if df.index.name is not None:
             if_drop = True if df.index.name in df else False
         else:
@@ -116,7 +117,8 @@ class _DataManager(metaclass = SingletonMeta):
         path = self.feather_path(category, code)
         df.to_feather(path)
 
-    def update_file(self, category, code, fetcher, index = 'date'):
+    @staticmethod
+    def update_file(category, code, fetcher, index = 'date'):
         def __msg(*txt):
             print(category, code, *txt)
 
@@ -129,8 +131,8 @@ class _DataManager(metaclass = SingletonMeta):
             # todo simple in future
             exist[index] = exist[index].apply(date_str2std)
             exist = exist[exist[index] == exist[index]]
-            # todo just for once
-            exist = exist[exist['derc_close'] == exist['derc_close']]
+
+            # exist = exist[exist['derc_close'] == exist['derc_close']]
 
             idx = exist[index]
             if idx[0] > idx[1]:
@@ -156,13 +158,11 @@ class _DataManager(metaclass = SingletonMeta):
 
     def loop_stocks(self, func, flag, show_seq = True, num_process = 4, limit = -1):
         return loop(func, self.code_list, num_process = num_process, flag = flag,
-            show_seq = show_seq,
-            limit = limit)
+                    show_seq = show_seq, limit = limit)
 
     def loop_index(self, func, flag, show_seq = True, num_process = 4, limit = -1):
         return loop(func, self.idx_list, num_process = num_process, flag = flag,
-            show_seq = show_seq,
-            limit = limit)
+                    show_seq = show_seq, limit = limit)
 
     def category_concat(self, code_list, category, columns, start_date, show_seq = False):
         tid = category + '_concat' + uid()
@@ -183,34 +183,36 @@ class _DataManager(metaclass = SingletonMeta):
         return getattr(self, tid)
 
     def all_csv2feather(self):
-        for key in DATA_FOLDERS:
-            folder = DATA_ROOT + DATA_FOLDERS[key] + '\\'
-            files = get_direct_files(folder)
-            for file in files:
-                if ext(file) != 'csv':
-                    continue
-                # print(folder,len(files))
+        for key in self.DATA_FOLDERS:
+            folder = DATA_ROOT + self.DATA_FOLDERS[key] + '\\'
+            file_list = get_direct_files(folder)
+            for file_name in file_list:
+                if ext(file_name) != 'csv':
+                    continue  # print(folder,len(files))
 
     def csv2feather(self, category, code):
-        file = self.csv_path(category, code)
+        old_file = self.csv_path(category, code)
         new_file = self.feather_path(category, code)
-        print(category, code, file, new_file)
-        df = pd.read_csv(file, encoding = GBK)
-        if df is None or df.shape[0] == 0: return
+        print(category, code, old_file, new_file)
+        df = pd.read_csv(old_file, encoding = GBK)
+        if df is None or df.shape[0] == 0:
+            return
         df.to_feather(new_file)
 
     def feather2csv(self, category, code):
         new_file = self.csv_path(category, code)
-        file = self.feather_path(category, code)
-        print(category, code, file, new_file)
-        df = pd.read_feather(file)
-        if df is None or df.shape[0] == 0: return
+        old_file = self.feather_path(category, code)
+        print(category, code, old_file, new_file)
+        df = pd.read_feather(old_file)
+        if df is None or df.shape[0] == 0:
+            return
         df.to_csv(new_file, index = False, encoding = GBK)
 
 
 DMgr = _DataManager()
 
 
+# noinspection PyTypeChecker
 class _DataWasher(metaclass = SingletonMeta):
     COLUMN_UPDATE = True
     DUPLICATE_SEPARATOR = '~'
@@ -229,17 +231,18 @@ class _DataWasher(metaclass = SingletonMeta):
                 f.write('{}')
         self.matched = file2obj(self.match_path)
 
-    def raw_regularI(self, df: pd.DataFrame, category = ''):
-        self.replaceI(df)
+    def raw_regular_i(self, df: pd.DataFrame, category = ''):
+        df.replace('--', 0, inplace = True)
+
         self.value_scale_by_column_name(df)
 
         matches = self._column_match(df, category)
         df.rename(columns = matches, inplace = True)
-        self.column_selectI(df)
+        self.column_select_i(df)
 
     # region column name regular
-
-    def _simplify_name(self, name):
+    @staticmethod
+    def _simplify_name(name):
         swap_pair = [['所有者', '股东'], ['的', ''], ['所', '']]
         for pair in swap_pair:
             name = name.replace(*pair)
@@ -264,7 +267,8 @@ class _DataWasher(metaclass = SingletonMeta):
                     if n == 1:
                         key, chosen = candidates[0]
                     else:
-                        key, chosen = max_at(candidates, lambda cand: len(cand[1]['alias']))
+                        key, chosen = max_at(candidates,
+                                             lambda candidate: len(candidate[1]['alias']))
                     new_name = chosen['field']
 
                     matches[col_name] = new_name
@@ -289,78 +293,76 @@ class _DataWasher(metaclass = SingletonMeta):
                 obj2file(self.match_path, self.matched)
         return matches
 
-    def column_selectI(self, df):
+    def column_select_i(self, df):
         keys = {}
         cols_id = [[x.split(self.DUPLICATE_SEPARATOR)[0], x] for x in df.columns]
-        for id, col in cols_id:
-            if id not in keys:
-                keys[id] = [0, [col]]
+        for idx, col in cols_id:
+            if idx not in keys:
+                keys[idx] = [0, [col]]
             else:
-                keys[id][0] += 1
-                keys[id][1].append(col)
+                keys[idx][0] += 1
+                keys[idx][1].append(col)
         dup_list = [[key, *keys[key]] for key in keys if keys[key][0] > 0]
-        for id, _, fields in dup_list:
+        for idx, _, fields in dup_list:
             # if keys[id][0] > 1:
             for field in fields:
-                if id == 'date' and field != 'date':
+                if idx == 'date' and field != 'date':
                     if field in df:
                         df.drop(field, axis = 1, inplace = True)
-                elif id != field:
-                    column_compare_chooseI(df, id, field)
+                elif idx != field:
+                    column_compare_choose_i(df, idx, field)
 
     # endregion
 
     # region one time active for files
-
-    def simplify_dirs(cls, category):
-        folder = DATA_ROOT + DATA_FOLDERS[category] + '\\'
+    @staticmethod
+    def simplify_dirs(category):
+        folder = DATA_ROOT + _DataManager.DATA_FOLDERS[category] + '\\'
         prefix = re.compile('([0-9]*.csv)')
-        for file in os.listdir(folder):
-            new_file = prefix.search(file)[0]
+        for file_name in os.listdir(folder):
+            new_file = prefix.search(file_name)[0]
             # print(file,nf)
-            os.rename(folder + file, folder + new_file)
+            os.rename(folder + file_name, folder + new_file)
 
-    def simplify_mapper(cls):
+    def simplify_mapper(self):
         pattern = re.compile(r'(.*)(\s*\(|（)')
-        for row in cls.mapper.iterrows():
+        for row in self.mapper.iterrows():
             alias = row[1]['alias']
             # print(alias)
             if isinstance(alias, str) and ('(' in alias or '（' in alias):
                 match = pattern.match(alias)
                 new_alias = match.group(1)
-                cls.mapper.ix[row[0], 'alias'] = new_alias
+                self.mapper.ix[row[0], 'alias'] = new_alias
                 print(new_alias)
 
     # endregion
 
-    # region number & scale
-    def replaceI(self, df: pd.DataFrame, old = '--', new = 0):
-        df.replace(old, new, inplace = True)
-
-    def value_scale_by_column_name(self, df: pd.DataFrame):
+    @staticmethod
+    def value_scale_by_column_name(df: pd.DataFrame):
         for col in df:
             if '万元' in col:
-                numericI(df, col)
+                numeric_i(df, col)
                 df[col] *= 10000
             elif '率' in col or '%' in col:
-                numericI(df, col)
+                numeric_i(df, col)
                 df[col] /= 100
             elif '元' in col:
-                numericI(df, col)
+                numeric_i(df, col)
 
-    def percentage_factor_by_values(self, series: pd.Series):
+    # noinspection PyTypeChecker
+    @staticmethod
+    def percentage_factor_by_values(series: pd.Series):
         series.dropna(inplace = True)
-        if (series < 1).all():
+        if np.all(series < 1):
             return 1
-        if (series > 2).all():
+        if np.all(series > 2):
             return 100
-        raise Exception('Can not determing percentage factor!')
+        raise Exception('Can not determine percentage factor!')
 
-    # endregion
-
-    def ttm_column(self, df, column, new_column = None, n = 4):
-        newCol = column + TTM_SUFFIX if new_column is None else new_column
-        df[newCol] = 0
+    @staticmethod
+    def ttm_column(df, column, new_column = None, n = 4):
+        new_col = column + TTM_SUFFIX if new_column is None else new_column
+        df[new_col] = 0
         if 'quarter' not in df:
             print('no quarter given, aborted!')
             return
@@ -374,51 +376,53 @@ class _DataWasher(metaclass = SingletonMeta):
 
             def ttm2(row):
                 cur = row[column]
-                last = row[last_col]
-                res = cur if row['quart'] == '1' else cur - last
-                return res if cur > 0 else last if last > 0 else np.nan
+                last_val = row[last_col]
+                res = cur if row['quart'] == '1' else cur - last_val
+                return res if cur > 0 else last_val if last_val > 0 else np.nan
 
-            ttms = df.apply(ttm2, axis = 1)
-            ttms.fillna(method = 'pad', inplace = True)
+            ttm_list = df.apply(ttm2, axis = 1)
+            ttm_list.fillna(method = 'pad', inplace = True)
         else:
             last = [0, 0, 0, 0, 0]
 
-            def get_ttm(row, last):
+            def get_ttm(row, last_val_list):
                 cur = row[column]
                 qs = row['quarter']
                 year, qt = qs.split(QUARTER_SEPARATOR)
                 qt = int(qt)
-                ttm = cur + last[4] - last[qt]
-                last[qt] = cur
+                ttm = cur + last_val_list[4] - last_val_list[qt]
+                last_val_list[qt] = cur
                 return ttm
 
-            ttms = df.apply(lambda row: get_ttm(row, last), axis = 1)
-        return ttms
+            ttm_list = df.apply(lambda row: get_ttm(row, last), axis = 1)
+        return ttm_list
 
-    def ttm_dict(self, dict):
-        if len(dict) == 2:
+    @staticmethod
+    def ttm_dict(val_dict):
+        if len(val_dict) == 2:
             qts = []
-            vals = []
-            for key, value in dict.items():
+            values = []
+            for key, value in val_dict.items():
                 _, qt = key.split(QUARTER_SEPARATOR)
                 qts.append(qt)
-                vals.append(value)
+                values.append(value)
             if qts[1] == '1':
-                return vals[1] if vals[1] > 0 else vals[0]
+                return values[1] if values[1] > 0 else values[0]
             else:
-                return vals[1] - vals[0] if vals[1] > 0 else vals[0]
+                return values[1] - values[0] if values[1] > 0 else values[0]
         else:
             last = [0, 0, 0, 0, 0]
             ttm = 0
-            for key in dict:
-                val = dict[key]
+            for key in val_dict:
+                val = val_dict[key]
                 year, qt = key.split(QUARTER_SEPARATOR)
                 qt = int(qt)
                 ttm = val + last[4] - last[qt]
                 last[qt] = val
             return ttm
 
-    def get_changeI(self, df: pd.DataFrame):
+    @staticmethod
+    def calc_change_i(df: pd.DataFrame):
         pre_close = df['close'].values
         pre_close = np.insert(pre_close, 0, np.nan)
         pre_close = pre_close[0:len(pre_close) - 1]
@@ -433,10 +437,6 @@ class _DataWasher(metaclass = SingletonMeta):
 
         pr = 'derc_close' if 'derc_close' in df else 'close'
         df['change_rate'] = df[pr].rolling(2).apply(ratio)
-
-    def idx_by_quarter(self, df):
-        df.index = df.quarter
-        return df
 
 
 DWash = _DataWasher()

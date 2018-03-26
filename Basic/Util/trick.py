@@ -2,20 +2,20 @@ import random
 from uuid import uuid4
 
 
-def pNum(*arg):
+def print_num(*arg):
     line = ''
     for ar in arg:
         if isinstance(ar, float) or isinstance(ar, int):
             line += '%e  ' % ar
         else:
-            line +='%s  ' %ar
+            line += '%s  ' % ar
 
     print(line)
 
 
 def uid():
-    uid = uuid4()
-    return str(uid)
+    unique_id = uuid4()
+    return str(unique_id)
 
 
 def split(number, n_shares):
@@ -43,8 +43,7 @@ def max_at(array, evaluate_func, limit_func = None, show = False):
                 chosen_list.append(element)
             elif cur_value > peak_value:
                 peak_value = cur_value
-                chosen_list = []
-                chosen_list.append(element)
+                chosen_list = [element]
             elif cur_value == peak_value:
                 chosen_list.append(element)
 
@@ -63,17 +62,18 @@ def min_at(array, evaluate_func, limit_func = None, show = False):
 
 
 class Counter(object):
+
     def __init__(self, step = 1):
         self.i = 0
-        self.curstep = 0
+        self.cur_step = 0
         self.step = step
 
     @property
-    def istep(self):
+    def portion_step(self):
         return int(self.i / self.step)
 
-    def addprint(self):
+    def add_print(self):
         self.i += 1
-        if self.istep > self.curstep:
-            self.curstep = self.istep
-            print(self.curstep)
+        if self.portion_step > self.cur_step:
+            self.cur_step = self.portion_step
+            print(self.cur_step)

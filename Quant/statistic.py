@@ -2,6 +2,7 @@ from .formulary import *
 
 
 class Updater:
+
     @classmethod
     def everything(cls):
         # raw data fetch
@@ -34,6 +35,12 @@ class Updater:
 
     # region target
     @classmethod
+    def target_pipeline(cls, target_list):
+        cls.targets_calculate(target_list)
+        cls.targets_stock2cluster(target_list)
+        cls.targets_cluster2stock(target_list)
+
+    @classmethod
     def targets_calculate(cls, target_list):
         def calc(code):
             # if os.path.getmtime(DMgr.csv_path('stock_target', code)) >= datetime(2018, 3, 18, 23,
@@ -51,8 +58,8 @@ class Updater:
         all_quarters = quarter_range()
 
         sort_method = {
-            'max'        : lambda series: series.sort_values(ascending = True).index,
-            'min'        : lambda series: series.sort_values(ascending = False).index,
+            'max':         lambda series: series.sort_values(ascending = True).index,
+            'min':         lambda series: series.sort_values(ascending = False).index,
             'minus_verse': minus_verse}
 
         def combine_stocks(code_list):
@@ -70,15 +77,15 @@ class Updater:
             return comb
 
         def cluster_stat(target):
-            def combine_dict(target):
-                dfs = [dic[target] for dic in results]
+            def combine_dict(tar):
+                dfs = [dic[tar] for dic in results]
                 merged = None
-                for df in dfs:
+                for sub_df in dfs:
                     if merged is None:
-                        merged = df
+                        merged = sub_df
                     else:
-                        merged = pd.merge(merged, df, left_index = True, right_index = True,
-                            how = 'outer')
+                        merged = pd.merge(merged, sub_df, left_index = True, right_index = True,
+                                          how = 'outer')
                 return merged
 
             func_sort_idx = sort_method[Formula.target_trend[target]]
@@ -91,14 +98,14 @@ class Updater:
             def row_normal_stat(row):
                 series = row
                 quarter = row.name
-                val_count = (series == series).sum()
+                val_count = np.count_nonzero(series == series)
                 if val_count < row.size / 10 or val_count < 20:
                     return
                 # print(val_count)
-                mu, sigma = normal_test(series,
-                    '%s at %s with %s points' % (target, quarter, val_count))
+                notice = '%s at %s with %s points' % (target, quarter, val_count)
+                mu, sigma = normal_test(series, notice)
                 ids = [i for i in range(val_count)]
-                na = [np.nan for i in range(series.size - val_count)]
+                na = [np.nan for _ in range(series.size - val_count)]
 
                 sorted_index = func_sort_idx(series)
                 ids = pd.Series(ids + na, index = sorted_index + PERCENTILE)
@@ -116,8 +123,7 @@ class Updater:
         arr_list = np.array_split(DMgr.code_list, n)
         results = loop(combine_stocks, arr_list, flag = 'stock_target_combine', num_process = n)
 
-        m = min(len(target_list), 7)
-        loop(cluster_stat, target_list, num_process = m, flag = 'cluster_target_stat')
+        loop(cluster_stat, target_list, num_process = n, flag = 'cluster_target_stat')
 
     @classmethod
     def targets_cluster2stock(cls, target_list):
@@ -125,17 +131,17 @@ class Updater:
         :return:
         """
 
-        target_dfs = DMgr.read('cluster_target', target_list, DWash.idx_by_quarter)
+        target_dfs = DMgr.read('cluster_target', target_list, idx_by_quarter)
 
         def cluster_separate_by_code(code):
             comb = pd.DataFrame()
             for target in target_dfs:
                 for suf in [PERCENTILE, STD_DISTANCE]:
                     source_col = code + suf
-                    dest_col = target + suf
+                    destination_col = target + suf
                     if source_col not in target_dfs[target]:
                         continue
-                    comb[dest_col] = target_dfs[target][source_col]
+                    comb[destination_col] = target_dfs[target][source_col]
 
             comb.dropna(axis = 0, how = 'all', inplace = True)
             comb['quarter'] = comb.index
@@ -143,15 +149,35 @@ class Updater:
             df = pd.merge(df, comb, on = 'quarter', how = 'left')
             DMgr.save(df, 'stock_target', code)
 
-        DMgr.loop_stocks(cluster_separate_by_code, 'cluster_separate', show_seq = True,
-            num_process = 7)
+        DMgr.loop_stocks(cluster_separate_by_code, 'cluster_separate', num_process = 7)
 
-    # endregion
-
-
-class Stat:
     @classmethod
-    def test(cls):
+    def cluster_spread(cls, target_list):
+        def spread(target):
+            df = DMgr.read('cluster_target', target)
+            df.index = df.quarter
+            tail_dict = {}
+            for col in df:
+                for tail in [PERCENTILE, STD_DISTANCE]:
+                    if col.endswith(tail):
+                        if tail not in tail_dict:
+                            tail_dict[tail] = []
+                        tail_dict[tail].append(col)
+            for tail in tail_dict:
+                sub = df[tail_dict[tail]]
+                nc = {}
+                for col in sub:
+                    nc[col] = col.replace(PERCENTILE, '')
+                sub.rename(columns = nc, inplace = True)
+                DMgr.save(sub, 'cluster_target', target + tail)
+
+        loop(spread, target_list, num_process = 4, flag = 'cluster_target_spread')  # endregion
+
+
+class Strategy:
+
+    @classmethod
+    def profit_measures(cls):
         sd_sets = {}
         for target in ['ROE', 'ROA', 'ROC', 'ROIC', 'RNOA']:
             mus = []
@@ -161,16 +187,15 @@ class Stat:
                 if code in df:
                     se = df[code]
                     se = se[se == se]
-                    os = se.size
+                    org_size = se.size
                     se = se[(se != np.inf) & (se != -np.inf)]
-                    afs = se.size
-                    if afs != os:
-                        print(target, code, os - afs)
+                    after_size = se.size
+                    if after_size != org_size:
+                        print(target, code, org_size - after_size)
                     if se.size > 3:
                         mu = se.mean()
                         if mu > 10:
-                            continue
-                            print(target, code, se)
+                            continue  # print(target, code, se)
                         sd = statistics.stdev(se)
                         if sd != sd:
                             print(code, se)
@@ -179,19 +204,17 @@ class Stat:
             # print(list)
             sd_sets[target] = [len(mus), statistics.mean(mus), statistics.mean(sds)]
         for key in sd_sets:
-            pNum(key, sd_sets[key])
+            print_num(key, sd_sets[key])
 
-
-class Analysis:
-    def __init__(self, code):
-        self.code = code
-        self.stat = DMgr.read('main_select', code)
-
-    def plot(self):
-        cols = [x for x in self.stat if PERCENTILE in x]
-        self.stat.plot(kind = 'line', y = cols)
-        plt.show()
-
-
-class Strategy:
-    pass
+    @classmethod
+    def find_security(cls):
+        df = DMgr.read('cluster_target', 'Policy' + PERCENTILE)
+        df.index = df.quarter
+        df.drop('quarter', axis = 1, inplace = True)
+        df = df[df > 0.99]
+        df.dropna(axis = 1, how = 'all', inplace = True)
+        last = df.iloc[-1]
+        last = last.dropna()
+        last = last.reset_index()
+        best = pd.merge(last, DMgr.code_table, how = 'left', left_on = 'index', right_on = 'code')
+        print(df.shape[1], last.size, best)

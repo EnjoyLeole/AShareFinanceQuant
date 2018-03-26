@@ -1,22 +1,22 @@
 # huileitest@abc123
-import pandas as pd
+from Basic.IO import dbf2df, list2csv
 from Basic.Util import uid
-from Basic.IO import list2csv, dbf2df
-from Funds import *
+from Quant import *
 
+# noinspection SpellCheckingInspection
 Acct = 'huileitest'
 # Acct = '700497'
 CurrAcctType = 'simulator'
 
 TradeSide = {
-    'buy': '1',
-    'sell': '2',
-    'buyETF': 'F',
+    'buy':     '1',
+    'sell':    '2',
+    'buyETF':  'F',
     'sellETF': 'G'}
 AcctType = {
-    'allStock': '0',
-    'szStock': 'F0',
-    'shStock': 'SHF0',
+    'allStock':  '0',
+    'szStock':   'F0',
+    'shStock':   'SHF0',
     'simulator': 'S0'}
 OrderStatus = {
     0: '已报',
@@ -27,30 +27,30 @@ OrderStatus = {
     5: '交易所拒单',
     6: '柜台未接受'}
 OrderType = {
-    'limit': '0',
-    'others_best': 'Q',
-    'self_best': 'S',
-    'best5_limit': 'R',
-    'best5_cancel': 'U',
-    'now_or_never': 'T',
+    'limit':          '0',
+    'others_best':    'Q',
+    'self_best':      'S',
+    'best5_limit':    'R',
+    'best5_cancel':   'U',
+    'now_or_never':   'T',
     'all_or_nothing': 'V'}
 
 
 def _get_path(name, suffix = ''):
-    ifDbf = False
-    DbfRoot = 'D:\Program Files\Wealth CATS 4.0_TestOut\scan_order\\'
-    CsvRoot = 'D:\Program Files\Wealth CATS 4.0_TestOut\CSVClientTrade\\'
-    File = {
-        'order': '\InPut\\',
-        'asset': 'asset',
+    if_dbf = False
+    dbf_root = 'D:\Program Files\Wealth CATS 4.0_TestOut\scan_order\\'
+    csv_root = 'D:\Program Files\Wealth CATS 4.0_TestOut\CSVClientTrade\\'
+    files = {
+        'order':  '\InPut\\',
+        'asset':  'asset',
         'report': 'order_updates'}
-    root = DbfRoot if ifDbf else CsvRoot
-    ext = '.dbf' if ifDbf else '.csv'
-    return root + File[name] + suffix + ext
+    root = dbf_root if if_dbf else csv_root
+    ext = '.dbf' if if_dbf else '.csv'
+    return root + files[name] + suffix + ext
 
 
 def policy():
-    return 0, 0, 0
+    return 0, 0, 0, 0
 
 
 def trade_run():
@@ -58,25 +58,26 @@ def trade_run():
 
     def check_report():
         report = _citics_df('report')
-        for id in ongoing:
-            path = _get_path('order', id)
+        for idx in ongoing:
+            path = _get_path('order', idx)
             import os
+
             if os.path.exists(path):
                 print('WCATS may not running! %s non-read!' % path)
                 continue
-            curr = report[report.client_id == id]
+            curr = report[report.client_id == idx]
             if len(curr) > 0:
                 status = curr.order_status
                 cont = True if status in [0, 1, 3] else False
                 follows = ''
                 if cont:
-                    ongoing.remove(id)
+                    ongoing.remove(idx)
                     follows = 'keep watching'
-                print('%s status: %s  %s' % (id, OrderStatus[status], follows))
+                print('%s status: %s  %s' % (idx, OrderStatus[status], follows))
             else:
-                print('WCATS doesnt has record of %s ' % id)
+                print('WCATS doesnt has record of %s ' % idx)
 
-    while (True):
+    while True:
         # current position
         # get policy
         code, trade_cate, ord_qty, ord_price = policy()
@@ -88,9 +89,8 @@ def trade_run():
 
 
 def write_order(code, trade_cate, ord_qty, ord_price = 0, ord_cate = 'self_best'):
-    OrderColumns = ['inst_type', 'acct_type', 'acct', 'symbol', 'ord_qty', 'tradeside',
-                    'ord_price',
-                    'ord_type', 'client_id', 'datetime']
+    order_columns = ['inst_type', 'acct_type', 'acct', 'symbol', 'ord_qty', 'tradeside',
+                     'ord_price', 'ord_type', 'client_id', 'datetime']
     inst_type = 'O'
     acct_type = AcctType[CurrAcctType]
     symbol = code2symbol(code)
@@ -98,9 +98,9 @@ def write_order(code, trade_cate, ord_qty, ord_price = 0, ord_cate = 'self_best'
     ord_type = OrderType[ord_cate]
 
     client_id = uid()
-    orderFile = _get_path('order', client_id)
+    order_file = _get_path('order', client_id)
     order = [inst_type, acct_type, Acct, symbol, ord_qty, trade_side, ord_price, ord_type]
-    list2csv(orderFile, order)
+    list2csv(order_file, order)
     return client_id
 
 
@@ -108,8 +108,8 @@ def withdraw_order(ord_no):
     inst_type = 'C'
     acct_type = AcctType[CurrAcctType]
     cmd = [inst_type, acct_type, Acct, ord_no]
-    orderFile = _get_path('order', )
-    list2csv(orderFile, cmd)
+    order_file = _get_path('order', )
+    list2csv(order_file, cmd)
 
 
 def _citics_df(name):

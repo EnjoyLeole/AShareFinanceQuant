@@ -1,9 +1,10 @@
-import numpy as np
+import matplotlib.mlab as matplot
 import matplotlib.pyplot as plt
-import matplotlib.mlab as mlab
+import numpy as np
 
-mu, sigma = 100, 15
-xr = mu + sigma * np.random.randn(10000)
+
+# mu, sigma = 100, 15
+# xr = mu + sigma * np.random.randn(10000)
 
 
 def plt_line(df):
@@ -19,8 +20,8 @@ def plt_hist(series, segment = 100):
     sigma = series.std()
 
     # add a 'best fit' line
-    y = mlab.normpdf(bins, mu, sigma)
-    l = plt.plot(bins, y, 'r--', linewidth = 1)
+    y = matplot.normpdf(bins, mu, sigma)
+    les = plt.plot(bins, y, 'r--', linewidth = 1)
 
     # plt.xlabel('Smarts')
     # plt.ylabel('Probability')

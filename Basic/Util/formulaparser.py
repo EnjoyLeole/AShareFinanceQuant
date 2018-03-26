@@ -9,7 +9,7 @@ class NumericStringParser(object):
     Most of this code comes from the fourFn.py pyparsing example
     '''
 
-    def pushFirst(self, strg, loc, toks):
+    def pushFirst(self, loc, toks):
         self.exprStack.append(toks[0])
 
     def pushUMinus(self, strg, loc, toks):
@@ -27,6 +27,7 @@ class NumericStringParser(object):
         term    :: factor [ multop factor ]*
         expr    :: term [ addop term ]*
         """
+        self.exprStack = []
         point = Literal(".")
         e = CaselessLiteral("E")
         fnumber = Combine(Word("+-" + nums, nums) +
@@ -98,7 +99,6 @@ class NumericStringParser(object):
             return float(op)
 
     def eval(self, num_string, parseAll = True):
-        self.exprStack = []
         results = self.bnf.parseString(num_string, parseAll)
         val = self.evaluateStack(self.exprStack[:])
         return val

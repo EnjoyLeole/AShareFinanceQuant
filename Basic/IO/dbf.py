@@ -13,5 +13,5 @@ def print_dbf(path):
     db = dbf.Table(path)
     db.open()
     print(dbf.field_names)
-    for record in dbf:
+    for record in db:
         print(record)

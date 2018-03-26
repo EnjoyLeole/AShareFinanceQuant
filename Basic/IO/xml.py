@@ -1,6 +1,7 @@
-import pandas
-from xml import etree
 import datetime
+from xml import etree
+
+import pandas
 
 
 def _xml_to_dataframe(xml_list):
@@ -20,7 +21,7 @@ def _xml_to_dataframe(xml_list):
         scenario = etree.fromstring(xml_str)
         positions = scenario[4]
         for position in positions:
-            position_size = (position.text).replace(',', '')
+            position_size = position.text.replace(',', '')
             scenario_data[position.get('id')].append(float(position_size))
 
     # Get dates
@@ -30,6 +31,6 @@ def _xml_to_dataframe(xml_list):
         date_string = scenario[1].text
         date = datetime.datetime.strptime(date_string, '%Y%m%d')
         scenario_dates.append(date)
-    df = pandas.DataFrame(scenario_data, index=scenario_dates)
+    df = pandas.DataFrame(scenario_data, index = scenario_dates)
 
     return df

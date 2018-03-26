@@ -1,10 +1,5 @@
 # -*- coding: utf-8 -*-
 import http.client
-import traceback
-import urllib
-
-import gzip
-from io import BytesIO
 
 HTTP_OK = 200
 HTTP_AUTHORIZATION_ERROR = 401
@@ -29,7 +24,7 @@ class MyClient:
     #     if self.httpClient is not None:
     #         self.httpClient.close()
     @classmethod
-    def getData(cls, path):
+    def get_date(cls, path):
         result = None
         if cls.httpClient is None:
             cls._connect()

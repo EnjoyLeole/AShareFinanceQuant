@@ -9,12 +9,12 @@ WARNING_LEVEL = 1
 COMPARED_FLAG = 'Done'
 
 
-def column_duplicate_removeI(df):
-    dups = [x for x in df if x.endswith(DUPLICATE_FLAG)]
-    df.drop(dups, axis = 1, inplace = True)
+def column_duplicate_remove_i(df):
+    duplicates = [x for x in df if x.endswith(DUPLICATE_FLAG)]
+    df.drop(duplicates, axis = 1, inplace = True)
 
 
-def column_compare_chooseI(df, origin, dual_key):
+def column_compare_choose_i(df, origin, dual_key):
     rename = lambda x: df.rename(columns = x, inplace = True)
     winner = []
 
@@ -34,7 +34,7 @@ def column_compare_chooseI(df, origin, dual_key):
     if isinstance(dual, pd.DataFrame):
         raise Exception('%s has multiple columns, Should handle before!' % dual_key)
 
-    numericI(df, [origin, dual_key])
+    numeric_i(df, [origin, dual_key])
     org_count = (df[origin] != 0).sum()
     dual_count = (df[dual_key] != 0).sum()
 
@@ -55,8 +55,7 @@ def column_compare_chooseI(df, origin, dual_key):
             __chose_dual()
     else:
         def validate(series):
-            if series[origin] != series[dual_key] and series[origin] != 0 and series[
-                dual_key] != 0:
+            if series[origin] != series[dual_key] and series[origin] != 0 and series[dual_key] != 0:
                 return 1
             return 0
 
@@ -77,14 +76,14 @@ def column_compare_chooseI(df, origin, dual_key):
     return winner
 
 
-def fill_miss(df, refer_idxs, brief_col = 'quarter', ifLabelingFilled = True):
-    missing = [x for x in refer_idxs if x not in df[brief_col].values]
+def fill_miss(df, refer_indexes, brief_col = 'quarter', if_labeling_filled = True):
+    missing = [x for x in refer_indexes if x not in df[brief_col].values]
     missing = list(set(missing))
-    if ifLabelingFilled:
+    if if_labeling_filled:
         df[FORCE_FILLED] = False
     for qt in missing:
         df.loc[qt, brief_col] = qt
-        if ifLabelingFilled:
+        if if_labeling_filled:
             df.loc[qt, FORCE_FILLED] = True
     df = df.fillna(method = 'pad')  # todo better fill
     return df
@@ -112,10 +111,14 @@ def reduce2brief(df, brief_col = 'quarter', detail_col = 'date'):
     return df_reduced
 
 
-def brief_detail_merge(brief, detail, ifReduce2brief = False, brief_col = 'quarter',
+def brief_detail_merge(brief, detail, if_reduce2brief = False, brief_col = 'quarter',
                        detail_col = 'date'):
     """将周期不同的两张表做合并，在两表的index不完全重合时，会使用相邻项进行填充
-    :param ifReduce2brief
+    :param detail:
+    :param brief_col:
+    :param detail_col:
+    :param brief:
+    :param if_reduce2brief
         True:以汇总表为基础合并，明细表中取detail_col最大项
         False：以明细表为基础合并，汇总表分散对应至明细表中各个brief_col的相同项
     """
@@ -128,38 +131,40 @@ def brief_detail_merge(brief, detail, ifReduce2brief = False, brief_col = 'quart
     brief.index = brief[brief_col]
     brief = brief[brief[brief_col] > '']
 
-    if ifReduce2brief:
+    if if_reduce2brief:
         df_reduced = reduce2brief(detail, brief_col, detail_col)
         if df_reduced.shape[0] < brief.shape[0]:
             df_reduced = fill_miss(df_reduced, brief.index, brief_col)
         detail = df_reduced
-        method = 'left'
-        # valid = '1:m'
+        method = 'left'  # valid = '1:m'
     else:
         brief = fill_miss(brief, detail[brief_col], brief_col)
-        method = 'right'
-        # valid = '1:m'
+        method = 'right'  # valid = '1:m'
     df = pd.merge(brief, detail, on = brief_col, how = method, suffixes = ['', DUPLICATE_FLAG])
     df.sort_values([brief_col, detail_col], inplace = True)
 
     return df
 
 
-def numericI(df: pd.DataFrame, include = [], exclude = []):
+def numeric_i(df: pd.DataFrame, include = None, exclude = None):
+    if include is None:
+        include = []
+    if exclude is None:
+        exclude = []
     include = df if len(include) == 0 else include
     include = [include] if not isinstance(include, list) else include
     for col in include:
         if col not in exclude and df[col].dtype in [object, str]:
             try:
                 df[col] = df[col].astype(np.float64)  # print('simple')
-            except Exception as e:
+            except Exception as _:
                 df[col] = df[col].apply(__to_num)
 
 
-def __to_num( val):
+def __to_num(val):
     try:
         return float(val)
-    except:
+    except Exception as _:
         return 0
 
 
@@ -179,3 +184,8 @@ def minus_verse(series):
     se = pd.Series(index = comb)
     # return pos_idx + minus_idx + nan_idx
     return se.index
+
+
+def idx_by_quarter(df):
+    df.index = df.quarter
+    return df

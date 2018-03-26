@@ -179,14 +179,14 @@ class MySqlHandler(DataHandler):
                               self.Engine)['table_name'].tolist()
 
     def _get_table_attr_sql(self, table_name, schema = None):
-        if schema == None:
+        if schema is None:
             schema = self.schema
         sql_cmd = "select COLUMN_NAME from information_schema.COLUMNS " \
                   "where table_name = '%s' and table_schema='%s'" % (table_name, schema)
         return sql_cmd
 
     def _get_table_attr_value_type(self, table_name, schema = None):
-        if schema == None:
+        if schema is None:
             schema = self.schema
         return "select COLUMN_NAME,DATA_TYPE from information_schema.COLUMNS " \
                "where table_name = '%s' and table_schema='%s'" % (table_name, schema)
@@ -208,6 +208,9 @@ class PgSQLHandler(DataHandler):
 
     def prefix_name(self, name):
         return "\"%s\"" % name
+
+    def _get_table_attr_value_type(self, table_name, schema = None):
+        pass
 
 
 def hdf2pgsql(self, hdf_handler):
@@ -255,8 +258,14 @@ class HDFHandler(DataHandler):
             ds = self.table_read(ds_name)
             self.table_save(ds, ds_name, file_no = "backup")
 
+    def _get_table_attr_sql(self, table_name, schema = None):
+        pass
+
 
 class MongoHandler(DataHandler):
+    def _get_table_attr_sql(self, table_name, schema = None):
+        pass
+
     def __init__(self, db):
         super().__init__()
         self.Mongo_Stock = MongoClient('localhost', port = 27017)[db]

@@ -16,5 +16,5 @@ def save_pkg_list():
     call(cmd)
 
 
-def restore_pkgs():
+def restore_packages():
     call("pip install -r %s" % pkg_list)

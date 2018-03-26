@@ -2,6 +2,7 @@ import os
 import time
 
 import numpy as np
+# noinspection PyProtectedMember
 from pathos.multiprocessing import ProcessingPool as Pool
 
 from Basic.IO import obj2file
@@ -44,7 +45,8 @@ def loop(func, para_list, num_process = 1, flag = '', times = 1, delay = 0,
                             print(flag, para, 'multiprocess timeout:', e)
                             fails.append([flag, para])
                         else:
-                            if delay > 0:  time.sleep(delay)
+                            if delay > 0:
+                                time.sleep(delay)
                             return get_val(i + 1)
                     except Exception as e:
                         print(flag, para, 'multiprocess failures:', e)
@@ -60,6 +62,7 @@ def loop(func, para_list, num_process = 1, flag = '', times = 1, delay = 0,
     if num_process <= 1:
         final_result, failures = _process(para_list)
     else:
+        num_process = min(num_process, len(para_list))
         arr_list = np.array_split(para_list, num_process)
         print('process num:', num_process, 'job queue length:', len(para_list))
         with Pool() as pool:

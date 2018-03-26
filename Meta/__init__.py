@@ -1,5 +1,7 @@
-import pandas as pd
 import os
+
+import pandas as pd
+
 from Basic.IO import file2obj
 
 GBK = 'gbk'
@@ -8,7 +10,7 @@ META_DIR = os.path.dirname(os.path.abspath(__file__)) + '\\'
 DATA_ROOT = META_DIR + 'StockData\\'
 
 lib_path = {
-    'mapper' : META_DIR + 'field_mapper.csv',
+    'mapper':  META_DIR + 'field_mapper.csv',
     'formula': META_DIR + 'formula.csv',
     'matched': DATA_ROOT + 'matched.json'}
 lib = {}

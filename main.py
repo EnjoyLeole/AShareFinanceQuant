@@ -2,7 +2,7 @@ from timeit import timeit
 
 import numpy
 
-from Funds.statistic import *
+from Quant.statistic import *
 from Meta import *
 
 simples = {
@@ -220,7 +220,11 @@ def numba(arr = li):
 
 def df_test():
     df = DMgr.read('stock', letv)
-    df.to_csv(path)
+    se=df['close']
+    v=np.sum(se==se)
+    e=(se==se).sum()
+    print(v,e)
+    # df.to_csv(path)
 
 
 def feather_test():
@@ -230,7 +234,7 @@ def feather_test():
 
 
 def index_target_test(code = '399300'):
-    id = Indexs('hs300', code)
+    id = Indexes('hs300', code)
     id.calc_list()
 
 
@@ -271,15 +275,39 @@ def financial_expense_compare():
     print(dic)
 
 
+def war_game():
+    save_folder = 'C:\\Users\\Hui Lei\\Saved Games\\EugenSystems\\WarGame3\\'
+    li = get_direct_files(save_folder)
+    for f in li:
+        if ext(f) == 'wargamerpl2':
+            with open(save_folder + f, 'r', encoding = 'latin_1') as file:
+                content = file.read()
+                if '[IRQ] 1st Special Operations Brigade' in content:
+                    player_num = '"NbPlayer":"(\d+)"'
+                    nums = re.findall(player_num, content)
+                    print(f, 'players', nums[0])
+
+                    player_name = '"PlayerName":"(.+?)"'
+                    player_side = '"PlayerAlliance":"(\d)"'
+                    names = re.findall(player_name, content)
+                    sides = re.findall(player_side, content)
+                    for i in range(len(names)):
+                        if names[i] in ['[IRQ] 1st Special Operations Brigade','LongDiDi']:
+                            print(names[i], sides[i])
+                    # print(content)
+                    # break
+
 def test():
+    df_test()
+    # Updater.cluster_spread(Formula.polices)
+    # Strategy.find_security()
     # Updater.all_finance()
     # DWash.csv2feather()
     # DMgr.read2dict('cluster_target',Formula.key_targets)
     # Updater.targets_stock2cluster(Formula.polices)
     # feather_test()
-    DMgr.feather2csv('cluster_target','Policy')
+    # DMgr.feather2csv('cluster_target','Policy')
     # stock_vector_test(bcode)
-
 
 if __name__ == '__main__':
     print('start')
