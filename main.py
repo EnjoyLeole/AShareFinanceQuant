@@ -61,15 +61,15 @@ def derc_test():
 def fin_test():
     code = "agg_profit"
     cate = "temp"
-    df = DMgr.read(cate, code)
+    df = DMGR.read(cate, code)
     # self.mapper.to_csv("d:/test.csv")
 
-    df = DWash.quarter_ttm(df, 'net_profit')
+    df = DWASH.quarter_ttm(df, 'net_profit')
     print(df)
 
 
 def reform_test():
-    df = DMgr.read('stock', '000001')  # DWash.reform_tick(df,'index')
+    df = DMGR.read('stock', '000001')  # DWash.reform_tick(df,'index')
 
 
 # endregion
@@ -163,8 +163,8 @@ def reg_resolve_test(formula):
 
 # region formula
 def quarter_date_merge_test():
-    quart = DMgr.read('balance', code)
-    dat = DMgr.read('stock', code)
+    quart = DMGR.read('balance', code)
+    dat = DMGR.read('stock', code)
     # d1 = brief_detail_merge(quart, dat, ifReduce2brief = True)
     # d2 = brief_detail_merge(quart, dat, ifReduce2brief = False)
     # qddate=quart[['date','quarter']]
@@ -193,8 +193,8 @@ def stock_test(field):
 
 
 def code_re():
-    DMgr.code_table['code'] = DMgr.code_table['code'].apply(lambda x: x.zfill(6))
-    df = DMgr.code_table
+    DMGR.code_table['code'] = DMGR.code_table['code'].apply(lambda x: x.zfill(6))
+    df = DMGR.code_table
     df.to_csv('D:/code.csv', encoding = GBK)
 
 
@@ -219,7 +219,7 @@ def numba(arr = li):
 # endregion
 
 def df_test():
-    df = DMgr.read('stock', letv)
+    df = DMGR.read('stock', letv)
     se=df['close']
     v=np.sum(se==se)
     e=(se==se).sum()
@@ -228,9 +228,9 @@ def df_test():
 
 
 def feather_test():
-    df = DMgr.read('stock_target', '002004')
+    df = DMGR.read('stock_target', '002004')
     df.index = df.quarter
-    DMgr.save(df, 'temp', 'test_feather')
+    DMGR.save(df, 'temp', 'test_feather')
 
 
 def index_target_test(code = '399300'):
@@ -261,7 +261,7 @@ def error_reshow():
 
 def financial_expense_compare():
     dic = {}
-    for code in DMgr.code_list:
+    for code in DMGR.code_list:
         stk = Stocks(code)
         res_li = stk._financial_compare()
         if res_li is None:
@@ -298,7 +298,9 @@ def war_game():
                     # break
 
 def test():
-    df_test()
+    df=pd.DataFrame([1,2],index=[1,2])
+    if df.empty:
+        print(df==False)
     # Updater.cluster_spread(Formula.polices)
     # Strategy.find_security()
     # Updater.all_finance()

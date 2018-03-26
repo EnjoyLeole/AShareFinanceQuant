@@ -2,8 +2,18 @@ import json
 
 import tushare as ts
 import yahoo_finance as yf
+from urllib3 import PoolManager
 
 from .dataio import *
+
+
+def get_url(url, encoding=''):
+    if encoding == '':
+        encoding = GBK
+    pool = PoolManager()
+    res = pool.request('get', url)
+    res_dict = res.data.decode(encoding)
+    return res_dict
 
 
 class N163(object):
@@ -22,13 +32,13 @@ class N163(object):
     @classmethod
     def update_idx_hist(cls, code):
         category = 'index'
-        DMgr.update_file(category, code,
-                         lambda start_year: N163.fetch_hist(code, start_year, index = True))
+        DMGR.update_file(category, code,
+                         lambda start_year: N163.fetch_hist(code, start_year, index=True))
 
     @classmethod
     def update_stock_hist(cls, code):
         category = 'stock'
-        DMgr.update_file(category, code,
+        DMGR.update_file(category, code,
                          lambda start_year: N163.fetch_stock_combined_his(code, start_year))
 
     @classmethod
@@ -36,19 +46,19 @@ class N163(object):
         for cate in cls.url_finance:
             url = cls.url_finance[cate] % code
             # print(url)
-            df = pd.read_csv(url, encoding = GBK)
-            df.set_index(df.columns[0], inplace = True)
+            df = pd.read_csv(url, encoding=GBK)
+            df.set_index(df.columns[0], inplace=True)
             # DWash.replaceI(df, '--', 0)
-            df.dropna(1, 'all', inplace = True)
+            df.dropna(1, 'all', inplace=True)
             df = df.T.reset_index()
-            DWash.raw_regular_i(df, 'raw_finance_' + cate)
-            df.rename(columns = {
-                "index": "date"}, inplace = True)
-            DMgr.save(df, cate, code)
+            DWASH.raw_regular_i(df, 'raw_finance_' + cate)
+            df.rename(columns={
+                "index": "date"}, inplace=True)
+            DMGR.save(df, cate, code)
         print("%s saved" % code)
 
     @classmethod
-    def fetch_stock_combined_his(cls, code, start, end = None):
+    def fetch_stock_combined_his(cls, code, start, end=None):
         his = cls.fetch_hist(code, start, end)
         if his is None:
             return None
@@ -60,16 +70,16 @@ class N163(object):
             start_year = start.year
         derc = cls.fetch_derc(code, start_year, end.year if end is not None else None)
         if derc is not None:
-            df = pd.merge(his, derc, on = 'date', how = 'left')
+            df = pd.merge(his, derc, on='date', how='left')
             df['factor'] = df['derc_close'] / df['close']
         else:
             df = his
-        df.sort_values('date', inplace = True)
-        DWash.calc_change_i(df)
+        df.sort_values('date', inplace=True)
+        DWASH.calc_change_i(df)
         return df
 
     @classmethod
-    def fetch_derc(cls, code, start_year, end_year = None):
+    def fetch_derc(cls, code, start_year, end_year=None):
         start_year = max(start_year, 2014)
         end_year = today().year if end_year is None else end_year
 
@@ -83,10 +93,10 @@ class N163(object):
                 return None
             data = json.loads(res)['data']
             df = pd.DataFrame(data,
-                              columns = ['date', 'derc_open', 'derc_close', 'derc_high', 'derc_low',
-                                         'volume', 'change_rate'])
+                              columns=['date', 'derc_open', 'derc_close', 'derc_high', 'derc_low',
+                                       'volume', 'change_rate'])
 
-            df.drop(['volume', 'change_rate'], axis = 1, inplace = True)
+            df.drop(['volume', 'change_rate'], axis=1, inplace=True)
             df['date'] = df['date'].apply(date_str2std)
             return df
 
@@ -106,7 +116,7 @@ class N163(object):
         return derc
 
     @classmethod
-    def fetch_hist(cls, code, start = None, end = None, index = False):
+    def fetch_hist(cls, code, start=None, end=None, index=False):
         if end is not None:
             end = '&end=%s' % end
         else:
@@ -117,12 +127,12 @@ class N163(object):
         i = (0 if code[0] == '0' else 1) if index else (0 if code[0] == '6' else 1)
         url = cls.url_his % (i, code, start_str) + end
         # print(url)
-        df = pd.read_csv(url, encoding = GBK)
+        df = pd.read_csv(url, encoding=GBK)
         if df.shape[0] == 0:
             return None
         flag = 'index_tick' if index else 'hist_tick'
-        DWash.raw_regular_i(df, flag)
-        df.sort_values('date', inplace = True)
+        DWASH.raw_regular_i(df, flag)
+        df.sort_values('date', inplace=True)
         return df
 
     @classmethod
@@ -131,17 +141,17 @@ class N163(object):
             if category == 'stock':
                 df = cls._update_stock_derc(category, code)
             else:
-                df = DMgr.read(category, code)
+                df = DMGR.read(category, code)
             if df is None:
                 return
-            DWash.calc_change_i(df)
-            DMgr.save(df, category, code)
+            DWASH.calc_change_i(df)
+            DMGR.save(df, category, code)
 
-        DMgr.loop(combine, code_list, category)
+        loop(combine, code_list, category)
 
     @classmethod
     def _update_stock_derc(cls, category, code):
-        df = DMgr.read(category, code)
+        df = DMGR.read(category, code)
         if df is None:
             return None
         df.date = df.date.apply(date_str2std)
@@ -167,11 +177,10 @@ class N163(object):
 
                 df.loc[key, 'derc_close'] = df.loc[key, 'close'] * last_factor
             last_factor = df.loc[key, 'factor'] = df.loc[key, 'derc_close'] / df.loc[key, 'close']
-        DWash.calc_change_i(df)
+        DWASH.calc_change_i(df)
         return df
 
 
-# noinspection SpellCheckingInspection
 class Tuget(object):
     MACRO = {
         "money_supply": "get_money_supply",
@@ -206,29 +215,29 @@ class Tuget(object):
         def _sh_margin():
             start = '1990-01-01'
             sh = ts.sh_margins(start)
-            sh.rename(columns = {
+            sh.rename(columns={
                 'opDate':   'date',
                 'rqylje':   'rqye',
-                'rzrqjyzl': 'rzrqye'}, inplace = True)
+                'rzrqjyzl': 'rzrqye'}, inplace=True)
             return sh
 
         def _sz_margin():
             end = today()
-            start = end - timedelta(days = 300)
+            start = end - timedelta(days=300)
             sz = pd.DataFrame()
             while True:
                 print('\n')
                 print(start, end)
                 cur = ts.sz_margins(start, end)
                 # print(cur)
-                if cur is None or len(cur) == 0:
+                if cur is None or cur.empty:
                     break
                 sz = pd.concat([cur, sz])
-                end = start - timedelta(days = 1)
-                start = end - timedelta(days = 300)
+                end = start - timedelta(days=1)
+                start = end - timedelta(days=300)
 
-            sz.rename(columns = {
-                'opDate': 'date'}, inplace = True)
+            sz.rename(columns={
+                'opDate': 'date'}, inplace=True)
             return sz
 
         mar = pd.concat([_sh_margin(), _sz_margin()])
@@ -236,19 +245,19 @@ class Tuget(object):
             'rzye':   'sum',
             'rqye':   'sum',
             'rzrqye': 'sum'})
-        DMgr.save(mar, 'macro', 'margin', index = True)
+        DMGR.save(mar, 'macro', 'margin')
 
     @classmethod
     def override_shibor(cls):
         start = 2006
         shibor = pd.DataFrame()
         while True:
-            tp = ts.shibor_data(start)
-            if tp is None:
+            table = ts.shibor_data(start)
+            if table is None or table.empty:
                 break
-            shibor = pd.concat([shibor, tp])
+            shibor = pd.concat([shibor, table])
             start += 1
-        DMgr.save(shibor, 'macro', 'shibor')
+        DMGR.save(shibor, 'macro', 'shibor')
 
     @classmethod
     def override_macros(cls):
@@ -266,8 +275,8 @@ class Tuget(object):
         while True:
             try:
                 print('\n', start)
-                df = ts.profit_data(year = start, top = 'all')
-                if df is None or len(df) == 0:
+                df = ts.profit_data(year=start, top='all')
+                if df is None or df.empty:
                     break
                 df.sort_values('report_date')
                 sd = pd.concat([sd, df])
@@ -275,7 +284,7 @@ class Tuget(object):
             except Exception as e:
                 print(e)
                 break
-        DMgr.save(sd, 'macro', 'share_div')
+        DMGR.save(sd, 'macro', 'share_div')
 
     @classmethod
     def fetch_code_list(cls):
@@ -303,13 +312,12 @@ class Tuget(object):
     #  'stock_list',   # append =  #  False)  #   #  #  print(  # '股票列表已覆盖更新')
 
     @classmethod
-    def fetch_his_factor(cls, code, start = None, end = None, autype = None):
-        df = ts.get_h_data(code, date2str(start), date2str(end), autype = autype,
-                           drop_factor = False, )
+    def fetch_his_factor(cls, code, start=None, end=None, autype=None):
+        df = ts.get_h_data(code, date2str(start), date2str(end), autype=autype, drop_factor=False, )
         return df
 
     @staticmethod
-    def combine_163_sina_stock_hist(code, start = None):
+    def combine_163_sina_stock_hist(code, start=None):
         start = date_of(1988, 1, 1) if start is None else start
         end = today()
         ndf = N163.fetch_stock_combined_his(code, start)
@@ -319,10 +327,10 @@ class Tuget(object):
 
         tdf = Tuget.fetch_his_factor(code, start, end)
         tdf = tdf.reset_index()
-        tdf.drop(['volume', 'amount'], axis = 1, inplace = True)
+        tdf.drop(['volume', 'amount'], axis=1, inplace=True)
         tdf['date'] = tdf['date'].astype('str')
         # print(tdf.dtypes)
-        merged = pd.merge(ndf, tdf, on = ['date', 'close', 'high', 'low', 'open'])
+        merged = pd.merge(ndf, tdf, on=['date', 'close', 'high', 'low', 'open'])
         merged = merged.sort_values('date')
         return merged
 
@@ -333,12 +341,12 @@ class Tuget(object):
         for element in my_dict:
             method = getattr(ts, my_dict[element])
             df = method()
-            DMgr.save(df, name, element)
+            DMGR.save(df, name, element)
 
     @classmethod
     def _money_supply_month_clean(cls):
-        idex = ['macro', 'money_supply']
-        m2 = DMgr.read(*idex)
+        index = ['macro', 'money_supply']
+        m2 = DMGR.read(*index)
         last = ''
         for key, row in m2.iterrows():
             year, month = str(row['month']).split('.')
@@ -350,18 +358,18 @@ class Tuget(object):
             m2.ix[key, 'month'] = year + '-' + month
 
         print(m2['month'])
-        DMgr.save(m2, *idex)
+        DMGR.save(m2, *index)
 
 
 class Yahoo(object):
 
     @classmethod
     def hist_url(cls, code, start, end):
-        sy, sm, sd = start.split('-')
-        ey, em, ed = end.split('-')
-
-        url = 'http://ichart.finance.yahoo.com/table.csv?s=%s&a=%s&b=%s&c=%s&d=%s&e=%s&f=%s&g=d' \
-              '&ignore=.csv' % (code, sm, sd, sy, em, ed, ey)
+        start_year, start_month, start_day = start.split('-')
+        end_year, end_month, end_day = end.split('-')
+        url_str = 'http://ichart.finance.yahoo.com/table.csv?s=%s&a=%s&b=%s&c=%s&d=%s&e=%s&f=%s&g' \
+                  '=d&ignore=.csv'
+        url = url_str % (code, start_month, start_day, start_year, end_month, end_day, end_year)
         return url
 
     @classmethod

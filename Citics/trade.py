@@ -2,44 +2,12 @@
 from Basic.IO import dbf2df, list2csv
 from Basic.Util import uid
 from Quant import *
-
-# noinspection SpellCheckingInspection
-Acct = 'huileitest'
-# Acct = '700497'
-CurrAcctType = 'simulator'
-
-TradeSide = {
-    'buy':     '1',
-    'sell':    '2',
-    'buyETF':  'F',
-    'sellETF': 'G'}
-AcctType = {
-    'allStock':  '0',
-    'szStock':   'F0',
-    'shStock':   'SHF0',
-    'simulator': 'S0'}
-OrderStatus = {
-    0: '已报',
-    1: '部分成交',
-    2: '全部成交',
-    3: '部分撤单',
-    4: '全部撤单',
-    5: '交易所拒单',
-    6: '柜台未接受'}
-OrderType = {
-    'limit':          '0',
-    'others_best':    'Q',
-    'self_best':      'S',
-    'best5_limit':    'R',
-    'best5_cancel':   'U',
-    'now_or_never':   'T',
-    'all_or_nothing': 'V'}
+from .privacy import *
 
 
-def _get_path(name, suffix = ''):
+def _get_path(name, suffix=''):
     if_dbf = False
-    dbf_root = 'D:\Program Files\Wealth CATS 4.0_TestOut\scan_order\\'
-    csv_root = 'D:\Program Files\Wealth CATS 4.0_TestOut\CSVClientTrade\\'
+
     files = {
         'order':  '\InPut\\',
         'asset':  'asset',
@@ -88,7 +56,7 @@ def trade_run():
         check_report()
 
 
-def write_order(code, trade_cate, ord_qty, ord_price = 0, ord_cate = 'self_best'):
+def write_order(code, trade_cate, ord_qty, ord_price=0, ord_cate='self_best'):
     order_columns = ['inst_type', 'acct_type', 'acct', 'symbol', 'ord_qty', 'tradeside',
                      'ord_price', 'ord_type', 'client_id', 'datetime']
     inst_type = 'O'
