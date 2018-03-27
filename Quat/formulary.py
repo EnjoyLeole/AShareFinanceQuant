@@ -1,11 +1,16 @@
+# -*- coding: utf-8 -*-
+"""
+Formula calculate the indicators( targets in code) defined in formula.csv
+
+"""
+
 import math
 import statistics
-import warnings
 from functools import reduce
 
 import numba
 
-from .webio import *
+from .dataio import *
 
 KPI = 'kpi'
 POLICY = 'policy'
@@ -25,7 +30,7 @@ INDEX_DICT = {
     'ZZ500': ['zz500', '000905']}
 
 
-# todo Dupt  detail into ATO
+# todo Dupont detail into ATO
 def discount(year):
     return 1 / math.pow(1 + CAPITAL_COST, year)
 
@@ -268,25 +273,26 @@ FORMULA = _FinancialFormula()
 
 
 class Ticks(object):
-    If_Renew = True
+    If_Renew = False
+    DATA_SOURCE = ''
 
     @property
-    def target_category(self):
-        return self.type + '_target'
+    def target_source(self):
+        return self.DATA_SOURCE + '_target'
 
     @property
     def formulas(self):
-        return FORMULA.formula_by_type[self.type]
+        return FORMULA.formula_by_type[self.DATA_SOURCE]
 
     @property
     def last_quarter(self):
         return self.report['quarter'].iloc[-1]
 
-    def __init__(self, code, table_getter: callable, security_type: str, refer_index=None):
+    def __init__(self, code, table_getter: callable, refer_index=None):
         def raw_data_retrieve():
             report, tick = table_getter()
             if report is None or report.shape[0] == 0 or tick is None or tick.shape[0] == 0:
-                warnings.warn('%s %s do not have data!' % (security_type, code))
+                print('%s %s do not have data!' % (self.DATA_SOURCE, code))
                 self.non_data = True
                 return None, None
             tick.date = tick.date.apply(date_str2std)
@@ -296,7 +302,7 @@ class Ticks(object):
             return report, tick
 
         def saved_target_retrieve():
-            targets_table = DMGR.read(self.target_category, code)
+            targets_table = DMGR.read(self.target_source, code)
             if targets_table is None or self.If_Renew:
                 targets_table = pd.DataFrame(index=self.report.index)
                 targets_table['quarter'] = targets_table.index
@@ -305,7 +311,7 @@ class Ticks(object):
             return targets_table
 
         self.code = code
-        self.type = security_type
+
         self.refer_index = refer_index
 
         self.non_data = False
@@ -329,18 +335,15 @@ class Ticks(object):
     def calc_list(self, target_list=None):
         if self.non_data:
             return
-
         target_list = FORMULA.sub_targets[KPI] if target_list is None else target_list
-        cols = []
         for target in target_list:
-            cols.append(target)
             self.calc_target(target=target)
 
     def calc_target(self, formula=None, target: str = None, prelude=np.nan):
         if self.non_data:
             return None
         if formula is None and target is None:
-            raise Exception(' not specified at %s %s' % (self.type, self.code))
+            raise Exception(' not specified at %s %s' % (self.DATA_SOURCE, self.code))
         if formula is not None:
             target = formula.target
 
@@ -385,13 +388,17 @@ class Ticks(object):
         if not self.non_data:
             cols = [x for x in FORMULA.target_savings if x in self.major]
             targets = self.major[cols]
-            DMGR.save(targets, self.target_category, self.code)
+            DMGR.save(targets, self.target_source, self.code)
             if if_tick:
-                DMGR.save(self.tick, self.type, self.code)
+                self.save_ticks()
+
+    def save_ticks(self):
+        DMGR.save(self.tick, self.DATA_SOURCE, self.code)
 
 
 class Indexes(Ticks):
     _hs300 = None
+    DATA_SOURCE = 'index'
 
     @ClassProperty
     def hs300(self):
@@ -429,7 +436,7 @@ class Indexes(Ticks):
         self.elements_daily = code + '_daily'
         self.elements_quarter = code + '_quarterly'
 
-        super().__init__(code, __get_table, 'index')
+        super().__init__(code, __get_table, )
 
     def _fetch_element_report(self, start_date):
         all_fina = DMGR.category_concat(self.code_list, 'income', ['net_profit'], start_date)
@@ -455,6 +462,176 @@ class Indexes(Ticks):
 
 
 class Stocks(Ticks):
+    DATA_SOURCE = 'stock'
+    TICK_SOURCE = 'lines'
+    SIMPLE_COLUMNS = ['date', 'quarter', 'open', 'high', 'low', 'close', 'factor', 'derc_close',
+                      'volume', 'market_cap']
+    ACTIVE_TIME_LINE = std_date_str(today().year, 1, 1)
+
+    @classmethod
+    def simplify_line(cls, code):
+        df = DMGR.read('stock', code)
+        if df is None or df.shape[0] == 0 or date_str2std(df.iloc[-1].date) < cls.ACTIVE_TIME_LINE:
+            return
+        ticks = [x for x in FORMULA.sub_targets[TICK] if x in df]
+        # if 'derc_close' not in df:
+
+        df = df[cls.SIMPLE_COLUMNS + ticks]
+        DMGR.save(df, 'lines', code)
+
+    @classmethod
+    def simplify_all_lines(cls):
+        DMGR.loop_stocks(cls.simplify_line, 'simple_line')
+
+    @classmethod
+    def target_pipeline(cls, target_list):
+        cls.targets_calculate(target_list)
+        cls.targets_stock2cluster(target_list)
+        cls.targets_cluster2stock(target_list)
+
+    # region target
+
+    @classmethod
+    def targets_calculate(cls, target_list=None, code_list=None):
+        target_list = FORMULA.sub_targets[KPI] if target_list is None else target_list
+        code_list=code_list if code_list else DMGR.code_list
+        def calc(code):
+            # if os.path.getmtime(DMgr.csv_path('stock_target', code)) >= datetime(2018, 3, 18, 23,
+            #         0).timestamp():
+            #     print('%s jumped' % code)
+            #     return
+            stk = Stocks(code)
+            stk.calc_list(target_list)
+            stk.save_targets()
+
+        loop(calc, code_list, flag='target_calc', num_process=5,if_debug=False)
+
+    @classmethod
+    def targets_stock2cluster(cls, target_list):
+        all_quarters = quarter_range()
+
+        sort_method = {
+            'max':         lambda series: series.sort_values(ascending=True).index,
+            'min':         lambda series: series.sort_values(ascending=False).index,
+            'minus_verse': minus_verse}
+
+        def combine_stocks(code_list):
+            comb = {}
+            for code in code_list:
+                df = DMGR.read('stock_target', code)
+                if df is None:
+                    continue
+                df.index = df.quarter
+                for target in target_list:
+                    if target in df:
+                        if target not in comb:
+                            comb[target] = pd.DataFrame(index=all_quarters)
+                        comb[target][code] = df[target]
+            return comb
+
+        def cluster_stat(target):
+            def combine_dict(tar):
+                dfs = [dic[tar] for dic in results]
+                merged = None
+                for sub_df in dfs:
+                    if merged is None:
+                        merged = sub_df
+                    else:
+                        merged = pd.merge(merged, sub_df, left_index=True, right_index=True,
+                                          how='outer')
+                return merged
+
+            func_sort_idx = sort_method[FORMULA.target_favor_trend[target]]
+
+            df = combine_dict(target)
+            df.index.name = 'quarter'
+            df.dropna(axis=0, how='all', inplace=True)
+            percentile = pd.DataFrame(columns=df.columns + PERCENTILE)
+            std_dis = pd.DataFrame(columns=df.columns + STD_DISTANCE)
+
+            def row_normal_stat(row):
+                series = row
+                quarter = row.name
+                val_count = np.count_nonzero(series == series)
+                if val_count < row.size / 10 or val_count < 20:
+                    return
+                # print(val_count)
+                notice = '%s at %s with %s points' % (target, quarter, val_count)
+                mu, sigma = normal_test(series, notice)
+                ids = [i for i in range(val_count)]
+                nan_ids = [np.nan for _ in range(series.size - val_count)]
+
+                sorted_index = func_sort_idx(series)
+                ids = pd.Series(ids + nan_ids, index=sorted_index + PERCENTILE)
+                percentile.loc[quarter] = ids / val_count
+                sd = (series - mu) / sigma
+                sd.index = series.index + STD_DISTANCE
+                std_dis.loc[quarter] = sd
+
+            df.apply(row_normal_stat, axis=1)
+            df = pd.merge(df, percentile, how='left', left_index=True, right_index=True)
+            df = pd.merge(df, std_dis, how='left', left_index=True, right_index=True)
+            DMGR.save(df, 'cluster_target', target)
+
+        n = 5
+        arr_list = np.array_split(DMGR.code_list, n)
+        results = loop(combine_stocks, arr_list, flag='stock_target_combine', num_process=n)
+
+        loop(cluster_stat, target_list, num_process=n, flag='cluster_target_stat')
+
+    @classmethod
+    def targets_cluster2stock(cls, target_list, code_list=None):
+        """save market-wide statistic result back to stocks' target table
+        :return:
+        """
+
+        target_dfs = DMGR.read2dict('cluster_target', target_list, idx_by_quarter)
+        code_list = DMGR.code_list if code_list is None else code_list
+
+        def cluster_separate_by_code(code):
+            comb = pd.DataFrame()
+            for target in target_dfs:
+                for suf in [PERCENTILE, STD_DISTANCE]:
+                    source_col = code + suf
+                    destination_col = target + suf
+                    if source_col not in target_dfs[target]:
+                        continue
+                    comb[destination_col] = target_dfs[target][source_col]
+
+            comb.dropna(axis=0, how='all', inplace=True)
+            if comb.shape[0] == 0:
+                print('cluster_separate: not data to separate', code)
+                return
+            comb['quarter'] = comb.index
+            df = DMGR.read('stock_target', code)
+            df = pd.merge(df, comb, on='quarter', how='left')
+            DMGR.save(df, 'stock_target', code)
+
+        loop(cluster_separate_by_code, code_list, num_process=5, flag='cluster_separate')
+
+    @classmethod
+    def cluster_spread(cls, target_list):
+        def spread(target):
+            df = DMGR.read('cluster_target', target)
+            df.index = df.quarter
+            tail_dict = {}
+            for col in df:
+                for tail in [PERCENTILE, STD_DISTANCE]:
+                    if col.endswith(tail):
+                        if tail not in tail_dict:
+                            tail_dict[tail] = []
+                        tail_dict[tail].append(col)
+            for tail in tail_dict:
+                sub = df[tail_dict[tail]]
+                column_transactions = {col: col.replace(PERCENTILE, '') for col in sub}
+                # for col in sub:
+                #     nc[col] = col.replace(PERCENTILE, '')
+                sub.rename(columns=column_transactions, inplace=True)
+                DMGR.save(sub, 'cluster_target', target + tail)
+
+        loop(spread, target_list, num_process=4, flag='cluster_target_spread')
+
+    # endregion
 
     def __init__(self, code):
         def __get_table():
@@ -474,21 +651,27 @@ class Stocks(Ticks):
                     else:
                         report = pd.merge(report, df, on='quarter', suffixes=(
                             '', DWASH.DUPLICATE_SEPARATOR + table + DWASH.DUPLICATE_FLAG))
+                else:
+                    return None, None
             if report is not None and report.shape[0] > 0:
                 DWASH.column_select_i(report)
                 report.index = report.quarter
                 report.sort_index(inplace=True)
 
-            tick = DMGR.read('stock', code)
+            tick = DMGR.read(self.TICK_SOURCE, code)
             if tick is not None:
-                tick = tick.drop_duplicates(subset='date', keep='first')  # todo only once
+                # hopefully only once, but actually have to keep
+                tick = tick.drop_duplicates(subset='date', keep='first')
                 tick = tick[tick.close != 0]
                 DWASH.calc_change_i(tick)
                 tick.sort_values('date', inplace=True)
 
             return report, tick
 
-        super().__init__(code, __get_table, 'stock', Indexes.hs300)
+        super().__init__(code, __get_table, Indexes.hs300)
+
+    def save_ticks(self):
+        DMGR.save(self.tick, self.TICK_SOURCE, self.code)
 
     def _financial_compare(self):
         if self.non_data:

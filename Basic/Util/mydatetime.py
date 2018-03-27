@@ -24,7 +24,7 @@ def date_of(year, month, day):
     return datetime(year, month, day).date()
 
 
-def str2date(str_date, day_delta = 0):
+def str2date(str_date, day_delta=0):
     if '-' in str_date:
         reg = '%Y-%m-%d'
     elif '/' in str_date:
@@ -33,7 +33,7 @@ def str2date(str_date, day_delta = 0):
         reg = '%Y%m%d'
     try:
         dt = datetime.strptime(str_date, reg)
-        dt += timedelta(days = day_delta)
+        dt += timedelta(days=day_delta)
     except Exception as e:
         if 'Unnamed' not in str_date and str_date != ' ':
             print(str_date, e)
@@ -43,15 +43,15 @@ def str2date(str_date, day_delta = 0):
 
 def date2str(date_in):
     y, m, d = __parse_date(date_in)
-    return __std_date(y, m, d)
+    return std_date_str(y, m, d)
 
 
 def date_str2std(str_date):
     year, m, d = __parse_str(str_date)
-    return __std_date(year, m, d)
+    return std_date_str(year, m, d)
 
 
-def __std_date(year, month, day):
+def std_date_str(year, month, day):
     if year is None or month is None or day is None:
         return np.nan
     return '%s%s%s%s%s' % (year, DATE_SEPARATOR, month, DATE_SEPARATOR, day)
@@ -109,7 +109,7 @@ def __parse_date(date_str):
     raise Exception('%s unpredicted!' % date_str)
 
 
-def to_quarter(date_str = 'non-give'):
+def to_quarter(date_str='non-give'):
     # assert isinstance(date_str, str)
     year, month, day = __parse_date(date_str)
     month_quarters = [['03', QUARTER_SEPARATOR + '1'], ['06', QUARTER_SEPARATOR + '2'],
@@ -122,14 +122,14 @@ def to_quarter(date_str = 'non-give'):
             return year + t[1]
 
 
-def to_year(date_str = 'non-give'):
+def to_year(date_str='non-give'):
     year, month, day = __parse_date(date_str)
     if year is None:
         return None
     return year
 
 
-def to_month(date_str = 'non-give'):
+def to_month(date_str='non-give'):
     year, month, day = __parse_date(date_str)
     if year is not None:
         return '%s-%s' % (year, month)
@@ -159,8 +159,8 @@ def quarter_dates(quarter):
         '4': (('10', '01'), ('12', '31'))}
     dts = dates[qt]
 
-    start = __std_date(year, dts[0][0], dts[0][1])
-    end = __std_date(year, dts[1][0], dts[1][1])
+    start = std_date_str(year, dts[0][0], dts[0][1])
+    end = std_date_str(year, dts[1][0], dts[1][1])
     return start, end
 
 
@@ -187,7 +187,7 @@ def quarter_add(quarter, i):
     return '%s%s%s' % (year, QUARTER_SEPARATOR, q)
 
 
-def quarter_range(start_year = 1988, end_year = None):
+def quarter_range(start_year=1988, end_year=None):
     if end_year is None:
         end_year = today().year
     li = []
@@ -200,7 +200,7 @@ def quarter_range(start_year = 1988, end_year = None):
 class Quarter(object):
     """Year/quarter class"""
 
-    def __init__(self, init_year = 1990, init_quarter = 1, report_quarter = None):
+    def __init__(self, init_year=1990, init_quarter=1, report_quarter=None):
         if report_quarter is None:
             self.year = init_year
             self.quarter = init_quarter

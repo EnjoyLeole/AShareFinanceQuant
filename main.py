@@ -2,13 +2,13 @@ from timeit import timeit
 
 import numpy
 
-from Quant.statistic import *
-from Meta import *
+from Quat.statistic import *
+from Quat.webio import N163, WebCrawler
 
 simples = {
-    'letv'  : '300104',
-    'zzd'   : '002069',
-    'bym'   : '002570',
+    'letv':   '300104',
+    'zzd':    '002069',
+    'bym':    '002570',
     'maotai': '600519'}
 hr = '600276'
 letv = '300104'
@@ -26,21 +26,21 @@ dict = {
     'B': 200,
     'D': 300}
 list = [[1, 1, 1], [2, 2, 2], [3, 3, 3]]
-tdf = pd.DataFrame(list, columns = ['A', 'B', 'B'])
+tdf = pd.DataFrame(list, columns=['A', 'B', 'B'])
 
 formula = 'market_cap+total_liability-1cas3423h_at_end0~2+1200'
 eqt = '21361470000.0+107340000.0+7131370000.0+976342054116.0/21361470000.0+0.0+0.0'
 
-error_file = 'error_reshow.txt'
+error_file = 'error_reshow'
 
 
 # region web
 def all_update():
-    Updater.crawler_idx()
+    WebCrawler.index()
 
 
 def idx_hit():
-    df = N163.fetch_idx_hist('000001', start)
+    df = N163.fetch_hist('000001', start, index=True)
     print(df)
 
 
@@ -49,7 +49,7 @@ def N163_test():
 
 
 def derc_test():
-    df = Updater._update_stock_derc(bcode)
+    df = N163._update_stock_derc(bcode)
     # df=N163.fetch_derc(bcode, 2013)
     print(df)
 
@@ -79,14 +79,14 @@ def __byline(cls, form):
     def __get_val(obj, row):
         getter = {
             'obj': lambda row: getattr(getattr(obj, row.source), row.factor),
-            'df' : lambda row: getattr(obj, row.factor)}
+            'df':  lambda row: getattr(obj, row.factor)}
         if row.factor in cls.targets:
             val = cls.funcs[row.factor](obj)
         else:
             val = getter['df'](row)
         return val
 
-    def __calculator(obj, input_type = 'df'):
+    def __calculator(obj, input_type='df'):
         calc = {
             '+': lambda x, y: x + y,
             '-': lambda x, y: x - y,
@@ -164,11 +164,8 @@ def reg_resolve_test(formula):
 # region formula
 def quarter_date_merge_test():
     quart = DMGR.read('balance', code)
-    dat = DMGR.read('stock', code)
-    # d1 = brief_detail_merge(quart, dat, ifReduce2brief = True)
-    # d2 = brief_detail_merge(quart, dat, ifReduce2brief = False)
-    # qddate=quart[['date','quarter']]
-    # dq=d1.loc[:,['date','quarter']]
+    dat = DMGR.read('stock',
+                    code)
 
 
 def stock_test(field):
@@ -181,13 +178,13 @@ def stock_test(field):
         # res=tt.quota
 
         res = tt.targets.loc[:, [field]]
-        res.rename(columns = {
-            field: key}, inplace = True)
+        res.rename(columns={
+            field: key}, inplace=True)
 
         if df is None:
             df = res
         else:
-            df = pd.merge(res, df, left_index = True, right_index = True, how = 'outer')
+            df = pd.merge(res, df, left_index=True, right_index=True, how='outer')
     df.to_csv(path)
     print(df)
 
@@ -195,7 +192,7 @@ def stock_test(field):
 def code_re():
     DMGR.code_table['code'] = DMGR.code_table['code'].apply(lambda x: x.zfill(6))
     df = DMGR.code_table
-    df.to_csv('D:/code.csv', encoding = GBK)
+    df.to_csv('D:/code.csv', encoding=GBK)
 
 
 # endregion
@@ -205,26 +202,26 @@ li = [x for x in range(100)]
 li = numpy.array(li)
 
 
-def python(arr = li):
-    val = sum(arr)
-    # print(val)
+def python(arr=li):
+    val = sum(arr)  # print(val)
 
 
 @numba.jit
-def numba(arr = li):
-    val = sum(arr)
-    # print(val)
+def numba(arr=li):
+    val = sum(arr)  # print(val)
 
 
 # endregion
 
 def df_test():
+    # d=pd.Series([np.nan,1,np.nan,4,np.nan])
+    # print(d.fillna(method='bfill'))
+
     df = DMGR.read('stock', letv)
-    se=df['close']
-    v=np.sum(se==se)
-    e=(se==se).sum()
-    print(v,e)
-    # df.to_csv(path)
+    se = df['close']
+    v = np.sum(se == se)
+    e = (se == se).sum()
+    print(v, e)  # df.to_csv(path)
 
 
 def feather_test():
@@ -233,30 +230,35 @@ def feather_test():
     DMGR.save(df, 'temp', 'test_feather')
 
 
-def index_target_test(code = '399300'):
+def index_target_test(code='399300'):
     id = Indexes('hs300', code)
     id.calc_list()
 
 
-def stock_vector_test(code = hr, target = None):
+def stock_vector_test(code=hr, target=None):
     stk = Stocks(code)
     if target is None:
         df_res = stk.calc_list()
         stk.save_targets()
     else:
-        res = stk.calc_target(target = target)
+        res = stk.calc_target(target=target)
         stk.save_targets()
         print(res)
 
 
+def get_error_codes():
+    ef = 'error_reshow'
+    path = get_error_path('target_calc')
+    li = file2obj(path)
+    li = [x[1] for x in li]
+    return li
+
+
 def error_reshow():
-    path = get_error_path('')
-    list = file2obj(path)
-    list = [x[1] for x in list]
-    res = loop(lambda code: stock_vector_test(code = code), list, 1, flag = 'error_reshow',
-        if_debug = True)
-    obj2file(get_error_path(error_file), res)
-    print(res)
+    li = get_error_codes()
+    # for code in list:
+    #     DMGR.csv2feather('stock', code)
+    loop(Stocks.targets_cluster2stock, li, 1, flag='error_reshow', if_debug=True)
 
 
 def financial_expense_compare():
@@ -280,7 +282,7 @@ def war_game():
     li = get_direct_files(save_folder)
     for f in li:
         if ext(f) == 'wargamerpl2':
-            with open(save_folder + f, 'r', encoding = 'latin_1') as file:
+            with open(save_folder + f, 'r', encoding='latin_1') as file:
                 content = file.read()
                 if '[IRQ] 1st Special Operations Brigade' in content:
                     player_num = '"NbPlayer":"(\d+)"'
@@ -292,28 +294,26 @@ def war_game():
                     names = re.findall(player_name, content)
                     sides = re.findall(player_side, content)
                     for i in range(len(names)):
-                        if names[i] in ['[IRQ] 1st Special Operations Brigade','LongDiDi']:
-                            print(names[i], sides[i])
-                    # print(content)
-                    # break
+                        if names[i] in ['[IRQ] 1st Special Operations Brigade', 'LongDiDi']:
+                            print(names[i], sides[i])  # print(content)  # break
+
 
 def test():
-    df=pd.DataFrame([1,2],index=[1,2])
-    if df.empty:
-        print(df==False)
-    # Updater.cluster_spread(Formula.polices)
-    # Strategy.find_security()
-    # Updater.all_finance()
-    # DWash.csv2feather()
-    # DMgr.read2dict('cluster_target',Formula.key_targets)
-    # Updater.targets_stock2cluster(Formula.polices)
-    # feather_test()
-    # DMgr.feather2csv('cluster_target','Policy')
-    # stock_vector_test(bcode)
+    # li = get_error_codes()
+    # WebCrawler.stock()
+    # DMGR.loop_stocks(lambda code:DMGR.csv2feather('stock',code=code) ,'re_feather')
+    # Stocks.simplify_lines()
+
+    # Stocks.targets_calculate(FORMULA.sub_targets[POLICY],li)
+    # Stocks.targets_stock2cluster(FORMULA.sub_targets[POLICY])
+    # Stocks.cluster_spread(FORMULA.sub_targets[POLICY])
+
+    #  df_test()
+    #  Strategy.find_security()
+    #  stock_vector_test(bcode)
+
 
 if __name__ == '__main__':
     print('start')
-    print(timeit(test, number = 1))
+    print(timeit(test, number=1))
     times = 100
-    # print(timeit(df_test, number = times))
-    # print(timeit(feather_test, number = times))

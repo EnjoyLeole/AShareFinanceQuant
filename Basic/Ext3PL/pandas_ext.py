@@ -11,11 +11,11 @@ COMPARED_FLAG = 'Done'
 
 def column_duplicate_remove_i(df):
     duplicates = [x for x in df if x.endswith(DUPLICATE_FLAG)]
-    df.drop(duplicates, axis = 1, inplace = True)
+    df.drop(duplicates, axis=1, inplace=True)
 
 
 def column_compare_choose_i(df, origin, dual_key):
-    rename = lambda x: df.rename(columns = x, inplace = True)
+    rename = lambda x: df.rename(columns=x, inplace=True)
     winner = []
 
     def __chose_origin():
@@ -59,7 +59,7 @@ def column_compare_choose_i(df, origin, dual_key):
                 return 1
             return 0
 
-        unequal_num = df.apply(validate, axis = 1).sum()
+        unequal_num = df.apply(validate, axis=1).sum()
         if unequal_num / df.shape[0] > WARNING_LEVEL:
             print('Inconsistent for %s bigger than %s with %s in %s / %s records' % (
                 origin, dual_key, diff_rate, unequal_num, df.shape[0]))
@@ -76,7 +76,7 @@ def column_compare_choose_i(df, origin, dual_key):
     return winner
 
 
-def fill_miss(df, refer_indexes, brief_col = 'quarter', if_labeling_filled = True):
+def fill_miss(df, refer_indexes, brief_col='quarter', if_labeling_filled=True):
     missing = [x for x in refer_indexes if x not in df[brief_col].values]
     missing = list(set(missing))
     if if_labeling_filled:
@@ -85,12 +85,12 @@ def fill_miss(df, refer_indexes, brief_col = 'quarter', if_labeling_filled = Tru
         df.loc[qt, brief_col] = qt
         if if_labeling_filled:
             df.loc[qt, FORCE_FILLED] = True
-    df = df.fillna(method = 'pad')  # todo better fill
+    df = df.fillna(method='pad')
     return df
 
 
-def truncate_period(df, truncate_val, truncate_col = 'quarter'):
-    df.sort_values(truncate_col, inplace = True)
+def truncate_period(df, truncate_val, truncate_col='quarter'):
+    df.sort_values(truncate_col, inplace=True)
     last = df.iloc[-1]
     if last[truncate_col] != truncate_val:
         df.loc[truncate_val, :] = last
@@ -98,7 +98,7 @@ def truncate_period(df, truncate_val, truncate_col = 'quarter'):
     return df
 
 
-def reduce2brief(df, brief_col = 'quarter', detail_col = 'date'):
+def reduce2brief(df, brief_col='quarter', detail_col='date'):
     if brief_col not in df:
         detail2brief_func = INTERVAL_TRANSFER[(detail_col, brief_col)]
         df[brief_col] = df[detail_col].apply(detail2brief_func)
@@ -111,8 +111,8 @@ def reduce2brief(df, brief_col = 'quarter', detail_col = 'date'):
     return df_reduced
 
 
-def brief_detail_merge(brief, detail, if_reduce2brief = False, brief_col = 'quarter',
-                       detail_col = 'date'):
+def brief_detail_merge(brief, detail, if_reduce2brief=False, brief_col='quarter',
+                       detail_col='date'):
     """将周期不同的两张表做合并，在两表的index不完全重合时，会使用相邻项进行填充
     :param detail:
     :param brief_col:
@@ -127,7 +127,7 @@ def brief_detail_merge(brief, detail, if_reduce2brief = False, brief_col = 'quar
         detail[brief_col] = detail[detail_col].apply(detail2brief_func)
     if brief_col not in brief:
         brief[brief_col] = brief[detail_col].apply(detail2brief_func)
-    brief.sort_values(brief_col, inplace = True)
+    brief.sort_values(brief_col, inplace=True)
     brief.index = brief[brief_col]
     brief = brief[brief[brief_col] > '']
 
@@ -140,13 +140,13 @@ def brief_detail_merge(brief, detail, if_reduce2brief = False, brief_col = 'quar
     else:
         brief = fill_miss(brief, detail[brief_col], brief_col)
         method = 'right'  # valid = '1:m'
-    df = pd.merge(brief, detail, on = brief_col, how = method, suffixes = ['', DUPLICATE_FLAG])
-    df.sort_values([brief_col, detail_col], inplace = True)
+    df = pd.merge(brief, detail, on=brief_col, how=method, suffixes=['', DUPLICATE_FLAG])
+    df.sort_values([brief_col, detail_col], inplace=True)
 
     return df
 
 
-def numeric_i(df: pd.DataFrame, include = None, exclude = None):
+def numeric_i(df: pd.DataFrame, include=None, exclude=None):
     if include is None:
         include = []
     if exclude is None:
@@ -157,14 +157,15 @@ def numeric_i(df: pd.DataFrame, include = None, exclude = None):
         if col not in exclude and df[col].dtype in [object, str]:
             try:
                 df[col] = df[col].astype(np.float64)  # print('simple')
-            except Exception as _:
+            except ValueError as e:
+                print('nmeric_i',e)
                 df[col] = df[col].apply(__to_num)
 
 
 def __to_num(val):
     try:
         return float(val)
-    except Exception as _:
+    except ValueError as _:
         return 0
 
 
@@ -176,12 +177,12 @@ def minus_verse(series):
     """
     pos = series[series > 0]
     # print(pos.index)
-    pos_idx = pos.sort_values(ascending = False).index.values
+    pos_idx = pos.sort_values(ascending=False).index.values
     minus = series[series <= 0]
-    minus_idx = minus.sort_values(ascending = True).index.values
+    minus_idx = minus.sort_values(ascending=True).index.values
     nan_idx = series[series != series].index.values
     comb = np.concatenate((minus_idx, pos_idx, nan_idx))
-    se = pd.Series(index = comb)
+    se = pd.Series(index=comb)
     # return pos_idx + minus_idx + nan_idx
     return se.index
 

@@ -1,8 +1,35 @@
 # huileitest@abc123
 from Basic.IO import dbf2df, list2csv
 from Basic.Util import uid
-from Quant import *
+from Quat import *
 from .privacy import *
+
+TradeSide = {
+    'buy':     '1',
+    'sell':    '2',
+    'buyETF':  'F',
+    'sellETF': 'G'}
+AcctType = {
+    'allStock':  '0',
+    'szStock':   'F0',
+    'shStock':   'SHF0',
+    'simulator': 'S0'}
+OrderStatus = {
+    0: '已报',
+    1: '部分成交',
+    2: '全部成交',
+    3: '部分撤单',
+    4: '全部撤单',
+    5: '交易所拒单',
+    6: '柜台未接受'}
+OrderType = {
+    'limit':          '0',
+    'others_best':    'Q',
+    'self_best':      'S',
+    'best5_limit':    'R',
+    'best5_cancel':   'U',
+    'now_or_never':   'T',
+    'all_or_nothing': 'V'}
 
 
 def _get_path(name, suffix=''):

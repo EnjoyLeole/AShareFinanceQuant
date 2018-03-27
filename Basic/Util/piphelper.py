@@ -1,10 +1,11 @@
-import pip
 from subprocess import call
+
+import pip
 
 
 def update_all():
     for dist in pip.get_installed_distributions():
-        call("pip install --upgrade " + dist.project_name, shell = True)
+        call("pip install --upgrade " + dist.project_name, shell=True)
 
 
 pkg_list = 'D:/SoftWare/Developer/Python/pkg.txt'

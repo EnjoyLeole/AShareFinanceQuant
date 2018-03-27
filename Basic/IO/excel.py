@@ -4,18 +4,12 @@ from openpyxl.styles import Font
 
 @property
 def title():
-    return Font(
-        name = 'Arial',
-        size = 24,
-        bold = True,
-        italic = True,
-        vertAlign = None,
-        underline = 'none',
-        strike = False,
-        color = 'FFD700')
+    return Font(name='Arial', size=24, bold=True, italic=True, vertAlign=None, underline='none',
+                strike=False, color='FFD700')
 
 
 class ExcelHelper(object):
+
     @property
     def blank(self):
         bk = []
@@ -24,12 +18,12 @@ class ExcelHelper(object):
             bk.append(sep)
         return bk
 
-    def __init__(self, work_book_name = "test.xlsm"):
+    def __init__(self, work_book_name="test.xlsm"):
         super().__init__()
         self.file = work_book_name
-        self.workbook = xl.load_workbook(self.file, keep_vba = True)
+        self.workbook = xl.load_workbook(self.file, keep_vba=True)
 
-    def get_sheet(self, sheet = "report", if_exist = "append"):
+    def get_sheet(self, sheet="report", if_exist="append"):
         if self.workbook.sheetnames.__contains__(sheet):
             ws = self.workbook[sheet]
             if if_exist == "replace":
@@ -41,8 +35,7 @@ class ExcelHelper(object):
             ws = self.workbook.create_sheet(sheet)
         return ws
 
-    def df_to_excel(self, df, sheet = "report", if_exist = "append", index = False,
-                    column_before = False):
+    def df_to_excel(self, df, sheet="report", if_exist="append", index=False, column_before=False):
         ws = self.get_sheet(sheet, if_exist)
         keys = df.keys().values.tolist()
         if column_before:
@@ -61,7 +54,7 @@ class ExcelHelper(object):
             ws.append(li)
         ws.append(self.blank)
 
-    def series_to_excel(self, series, sheet = "report", if_exist = "append"):
+    def series_to_excel(self, series, sheet="report", if_exist="append"):
         ws = self.get_sheet(sheet, if_exist)
         # ws = wb.active
         ws.append(series.keys().values.tolist())

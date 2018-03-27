@@ -12,9 +12,7 @@ from Meta import *
 
 OLDEST_DATE = '1988-01-01'
 
-
 TTM_SUFFIX = '_ttm'
-
 
 
 def code2symbol(code):
@@ -32,9 +30,10 @@ class _DataManager:
         'balance':        'financial_balance',
         'cash_flow':      'financial_cash_flow',
         'income':         'financial_income',
-        'index':          'market_index',
+        'index':          'lines_index',
+        'stock':          'lines_stock',
+        'lines':          'lines_stock_simple',
         'macro':          'macro',
-        'stock':          'market_stock',
         'temp':           'temp',
         'category':       'category',
         'stock_target':   'target_stock',
@@ -96,18 +95,26 @@ class _DataManager:
         dic = {}
         for code in code_list:
             df = self.read(category, code)
+            if df is None:
+                print(code, 'not exist!')
+                continue
             if df_transfer is not None:
                 df = df_transfer(df)
             dic[code] = df
         return dic
 
-    def save(self, df: pd.DataFrame, category, code):
+    def save(self, df: pd.DataFrame, category, code, if_object2str=False):
         if df.index.name is not None:
             if_drop = True if df.index.name in df else False
         else:
             if_drop = True
         df = df.reset_index(drop=if_drop)
         path = self.feather_path(category, code)
+        if if_object2str:
+            for col in df:
+                if isinstance(df[col].dtype, object):
+                    df[col] = df[col].astype(str)
+
         df.to_feather(path)
 
     @staticmethod
@@ -121,14 +128,15 @@ class _DataManager:
             exist = pd.DataFrame()
             start = OLDEST_DATE
         else:
-            # todo simple in future
+            # todo hopefully only once
             exist[index] = exist[index].apply(date_str2std)
             exist = exist[exist[index] == exist[index]]
 
             # exist = exist[exist['derc_close'] == exist['derc_close']]
 
             idx = exist[index]
-            if idx[0] > idx[1]:
+
+            if exist.shape[0] > 1 and idx[0] > idx[1]:
                 exist.sort_values(index, inplace=True)
             start = exist[index].iloc[-1]
         if index == 'date':
@@ -146,10 +154,10 @@ class _DataManager:
 
         __msg(start, len(new))
         new = pd.concat([exist, new])
-        DMGR.save(new, category, code)
+        DMGR.save(new, category, code, if_object2str=True)
         return new
 
-    def loop_stocks(self, func, flag, num_process=4, limit=-1):
+    def loop_stocks(self, func: object, flag: str, num_process: int = 4, limit: int = -1) -> object:
         return loop(func, self.code_list, num_process=num_process, flag=flag, limit=limit)
 
     def loop_index(self, func, flag, num_process=4, limit=-1):
@@ -185,6 +193,8 @@ class _DataManager:
         old_file = self.csv_path(category, code)
         new_file = self.feather_path(category, code)
         print(category, code, old_file, new_file)
+        if not os.path.exists(old_file):
+            return
         df = pd.read_csv(old_file, encoding=GBK)
         if df is None or df.shape[0] == 0:
             return
@@ -222,8 +232,8 @@ class _DataWasher:
         self.matched = file2obj(self.match_path)
 
     def raw_regular_i(self, df: pd.DataFrame, category=''):
-        df.replace('--', 0, inplace=True)
-
+        for invaild_str in ['--',' --','\t\t']:
+            df.replace(invaild_str, 0, inplace=True)
         self.value_scale_by_column_name(df)
 
         matches = self._column_match(df, category)
@@ -351,7 +361,7 @@ class _DataWasher:
 
         df = df.sort_values('quarter')
         if n == 2:
-            col = df[column].fillna(method='pad')  # todo better fill
+            col = df[column].fillna(method='pad')
             df['quart'] = df['quarter'].apply(lambda x: x.split(QUARTER_SEPARATOR)[1])
             last_col = 'last' + column
             df[last_col] = col.shift(1)
@@ -404,6 +414,7 @@ class _DataWasher:
 
     @staticmethod
     def calc_change_i(df: pd.DataFrame):
+        numeric_i(df, ['close'])
         pre_close = df['close'].values
         pre_close = np.insert(pre_close, 0, np.nan)
         pre_close = pre_close[0:len(pre_close) - 1]

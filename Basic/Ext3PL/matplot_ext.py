@@ -12,16 +12,16 @@ def plt_line(df):
     plt.show()
 
 
-def plt_hist(series, segment = 100):
+def plt_hist(series, segment=100):
     series = series[(series == series) & (series != np.inf)]
     # the histogram of the data
-    n, bins, patches = plt.hist(series, segment, facecolor = 'green')
+    n, bins, patches = plt.hist(series, segment, facecolor='green')
     mu = series.mean()
     sigma = series.std()
 
     # add a 'best fit' line
     y = matplot.normpdf(bins, mu, sigma)
-    les = plt.plot(bins, y, 'r--', linewidth = 1)
+    les = plt.plot(bins, y, 'r--', linewidth=1)
 
     # plt.xlabel('Smarts')
     # plt.ylabel('Probability')

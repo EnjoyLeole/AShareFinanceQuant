@@ -15,7 +15,7 @@ class MyClient:
 
     @classmethod
     def _connect(cls):
-        cls.httpClient = http.client.HTTPSConnection(cls.domain, 80, timeout = 60)
+        cls.httpClient = http.client.HTTPSConnection(cls.domain, 80, timeout=60)
 
     # def __init__(self):
     #     self._connect()

@@ -89,7 +89,7 @@ def get_project_files(folder):
                 yield it_path
 
 
-def get_project_lines(folder, idx = -1):
+def get_project_lines(folder, idx=-1):
     def fileline(f_path):
         res = 0
         f = open(f_path, "r", 1, "utf8")
@@ -115,9 +115,9 @@ def get_project_lines(folder, idx = -1):
 
 def combine2one(folder, outfile):
     """ Delete blanklines of infile """
-    out_fp = open(outfile, "w", encoding = "gb18030", errors = "ignore")
+    out_fp = open(outfile, "w", encoding="gb18030", errors="ignore")
     for file in get_project_files(folder):
-        in_fp = open(file, "r", encoding = "gb18030", errors = "ignore")
+        in_fp = open(file, "r", encoding="gb18030", errors="ignore")
         lines = in_fp.readlines()
         for li in lines:
             if li.split():
@@ -138,7 +138,7 @@ def list2csv(path, list_values):
         file.write('\n')
 
 
-def obj2file(path, obj, mode = 'w'):
+def obj2file(path, obj, mode='w'):
     with open(path, mode) as file:
         content = str(obj)
         file.write(content)

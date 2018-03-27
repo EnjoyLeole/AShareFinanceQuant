@@ -29,7 +29,7 @@ def split(number, n_shares):
     return result
 
 
-def max_at(array, evaluate_func, limit_func = None, show = False):
+def max_at(array, evaluate_func, limit_func=None, show=False):
     peak_value = None
     chosen_list = []
 
@@ -57,13 +57,13 @@ def max_at(array, evaluate_func, limit_func = None, show = False):
         return None
 
 
-def min_at(array, evaluate_func, limit_func = None, show = False):
+def min_at(array, evaluate_func, limit_func=None, show=False):
     return max_at(array, lambda x: -1 * evaluate_func(x), limit_func, show)
 
 
 class Counter(object):
 
-    def __init__(self, step = 1):
+    def __init__(self, step=1):
         self.i = 0
         self.cur_step = 0
         self.step = step

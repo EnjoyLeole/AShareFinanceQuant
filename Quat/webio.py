@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+main tick data & finance report from www.163.com
+tushare offers macro economic data
+
+"""
+
 import json
 
 import tushare as ts
@@ -14,6 +21,39 @@ def get_url(url, encoding=''):
     res = pool.request('get', url)
     res_dict = res.data.decode(encoding)
     return res_dict
+
+
+class WebCrawler:
+
+    @classmethod
+    def everything(cls):
+        # raw data fetch
+        cls.index()
+        cls.stock()
+        cls.finance()
+        cls.macro()
+
+    # region raw data
+    @classmethod
+    def macro(cls):
+        Tuget.override_macros()
+        Tuget.override_margins()
+        Tuget.override_shibor()
+        Tuget.override_category()
+
+    @classmethod
+    def finance(cls):
+        DMGR.loop_stocks(N163.override_finance, 'financial_override', num_process=12)
+
+    @classmethod
+    def stock(cls):
+        DMGR.loop_stocks(N163.update_stock_hist, 'stock_update', num_process=12)
+
+    @classmethod
+    def index(cls):
+        DMGR.loop_index(N163.update_idx_hist, 'index_update', num_process=12)
+
+    # endregion
 
 
 class N163(object):
@@ -210,8 +250,10 @@ class Tuget(object):
         ts.new_stocks()  # 新股
         ts.xsg_data()  # 限售解禁
 
+    #  noinspection SpellCheckingInspection
     @classmethod
     def override_margins(cls):
+
         def _sh_margin():
             start = '1990-01-01'
             sh = ts.sh_margins(start)
@@ -312,8 +354,9 @@ class Tuget(object):
     #  'stock_list',   # append =  #  False)  #   #  #  print(  # '股票列表已覆盖更新')
 
     @classmethod
-    def fetch_his_factor(cls, code, start=None, end=None, autype=None):
-        df = ts.get_h_data(code, date2str(start), date2str(end), autype=autype, drop_factor=False, )
+    def fetch_his_factor(cls, code, start=None, end=None, recurrent_type=None):
+        df = ts.get_h_data(code, date2str(start), date2str(end), autype=recurrent_type,
+                           drop_factor=False, )
         return df
 
     @staticmethod

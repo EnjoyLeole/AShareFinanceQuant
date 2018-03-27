@@ -7,7 +7,7 @@ from pathos.multiprocessing import ProcessingPool as Pool
 
 from Basic.IO import obj2file
 
-DEBUG = True
+DEBUG = False
 
 MULTIPROCESS_FAILURE_FILE = lambda flag: 'D:/%s.txt' % flag
 
@@ -17,8 +17,8 @@ def put_failure_path(func):
     MULTIPROCESS_FAILURE_FILE = func
 
 
-def loop(func, para_list, num_process = 1, flag = '', times = 1, delay = 0,
-         show_seq = True, limit = -1, if_debug = False):
+def loop(func, para_list, num_process=1, flag='', times=1, delay=0, show_seq=True, limit=-1,
+         if_debug=False):
     if_debug = if_debug if if_debug else DEBUG
 
     def _process(arr):
@@ -66,9 +66,7 @@ def loop(func, para_list, num_process = 1, flag = '', times = 1, delay = 0,
         arr_list = np.array_split(para_list, num_process)
         print('process num:', num_process, 'job queue length:', len(para_list))
         with Pool() as pool:
-            outs = pool.map(_process, arr_list)
-            # pool.close()
-            # pool.join()
+            outs = pool.map(_process, arr_list)  # pool.close()  # pool.join()
         final_result = [r for x in outs for r in x[0]]
         failures = [f for x in outs for f in x[1]]
     if len(failures) > 0:

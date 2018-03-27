@@ -15,7 +15,7 @@ class Config(object):
         return self._db
 
     @classmethod
-    def set_db_handler(cls, db_handler, flag = 1):
+    def set_db_handler(cls, db_handler, flag=1):
         cls._db = db_handler
         cls.upper_flag = flag
 
@@ -40,23 +40,23 @@ class Config(object):
         for t in local.table_list:
             if t.count("config") and t != "configproject":
                 df = cls.table_read(t)
-                db_handler.table_save(df, t, append = False)
+                db_handler.table_save(df, t, append=False)
 
     @classmethod
     def table_read(cls, data_set_id):
         return cls.db_handler.table_read(data_set_id)
 
     @classmethod
-    def table_save(cls, df, data_set_id, append = True, schema = None):
+    def table_save(cls, df, data_set_id, append=True, schema=None):
         cls.db_handler.table_save(df, data_set_id, append, schema)
 
     @classmethod
-    def update(cls, glass, primary_key, table_name = ""):
+    def update(cls, glass, primary_key, table_name=""):
         table_name = (glass.__name__ if table_name == "" else table_name).lower()
         cls.db_handler.update(table_name, glass, primary_key)
 
     @classmethod
-    def load_setting(cls, glass, table_id, value, table_name = ""):
+    def load_setting(cls, glass, table_id, value, table_name=""):
         table_name = (glass.__name__ if table_name == "" else table_name).lower()
         df = cls.db_handler.table_read(table_name)
         df = df[df[table_id] == value]
@@ -78,13 +78,13 @@ class Config(object):
     def concat(cls, cls_list):
         dfs = []
         for glass in cls_list:
-            temp = cls._get_setting(glass, if_wide = False)
+            temp = cls._get_setting(glass, if_wide=False)
             dfs.append(temp)
-        df = pd.concat(dfs, axis = 1)
+        df = pd.concat(dfs, axis=1)
         return df
 
     @staticmethod
-    def _get_setting(glass, if_wide = False):
+    def _get_setting(glass, if_wide=False):
         df = pd.DataFrame()
         for field in glass.__dict__:
             value = getattr(glass, field)
@@ -96,5 +96,5 @@ class Config(object):
                 if (isinstance(value, value_type) or value is None) and field[0] != '_':
                     df[field] = [value]
 
-        df = df.sort_index(axis = 1)
+        df = df.sort_index(axis=1)
         return df
