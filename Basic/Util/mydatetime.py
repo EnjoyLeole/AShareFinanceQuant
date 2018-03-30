@@ -51,9 +51,19 @@ def date_str2std(str_date):
     return std_date_str(year, m, d)
 
 
+def _md_regular(val):
+    if isinstance(val, int):
+        val = str(val)
+    if len(val) < 2:
+        val = val.zfill(2)
+    return val
+
+
 def std_date_str(year, month, day):
     if year is None or month is None or day is None:
         return np.nan
+    month = _md_regular(month)
+    day = _md_regular(day)
     return '%s%s%s%s%s' % (year, DATE_SEPARATOR, month, DATE_SEPARATOR, day)
 
 

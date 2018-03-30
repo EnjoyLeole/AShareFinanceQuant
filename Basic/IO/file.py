@@ -4,6 +4,8 @@ import os
 import platform
 import sys
 
+from datetime import datetime, timedelta
+
 my_folder = ["D:\\Hui Lei\\OS_Autoplan", "D:\\Hui Lei\\VueJsSite\\src",
              "D:\\Downloads\\Cad-master\\"]
 
@@ -151,6 +153,15 @@ def file2obj(path):
     return result
 
 
+def file_just_modified(path, hours=1):
+    if os.path.exists(path) and os.path.getmtime(path) >= (
+            datetime.now() - timedelta(hours=hours)).timestamp():
+        return True
+    return False
+
+
+#     print('%s jumped' % code)
+#     return
 class CodeLines:
     path_cad = ''
 

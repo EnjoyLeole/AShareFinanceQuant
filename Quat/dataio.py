@@ -4,11 +4,18 @@ save & retrieve of data to feather format files
 data frame wash, including  ttm and columns rename
 """
 
+import os
 import re
 
-from Basic import *
-from Basic.IO.file import get_direct_files
-from Meta import *
+import numpy as np
+import pandas as pd
+
+from Basic.Ext3PL import column_compare_choose_i, numeric
+from Basic.Ext3PL.multipro import loop, put_failure_path
+from Basic.IO.file import ext, get_direct_files, obj2file
+from Basic.Util import QUARTER_SEPARATOR, date2str, date_str2std, max_at, quarter_add, str2date, \
+    to_quarter, today, uid
+from Meta import DATA_ROOT, GBK, get_error_path, get_lib, lib_path
 
 OLDEST_DATE = '1988-01-01'
 
@@ -86,7 +93,7 @@ class _DataManager:
 
     def read(self, category, code):
         path = self.feather_path(category, code)
-        if not os.path.exists(path):
+        if not os.path.exists(path) or os.stat(path).st_size == 0:
             return None
         df = pd.read_feather(path)
         return df
@@ -104,6 +111,9 @@ class _DataManager:
         return dic
 
     def save(self, df: pd.DataFrame, category, code, if_object2str=False):
+        if df.empty or df.shape[0] == 0:
+            print(category, code, 'df empty, saving abort!')
+            return
         if df.index.name is not None:
             if_drop = True if df.index.name in df else False
         else:
@@ -229,16 +239,19 @@ class _DataWasher:
         if not os.path.exists(self.match_path):
             with open(self.match_path, 'w') as match_file:
                 match_file.write('{}')
-        self.matched = file2obj(self.match_path)
+        self.matched = {}
+        # self.matched = file2obj(self.match_path)
 
-    def raw_regular_i(self, df: pd.DataFrame, category=''):
-        for invaild_str in ['--',' --','\t\t']:
-            df.replace(invaild_str, 0, inplace=True)
-        self.value_scale_by_column_name(df)
-
+    def raw_regular(self, df: pd.DataFrame, category=''):
+        for invalid_str in ['--', ' --', '', ' ', '\t\t']:
+            df.replace(invalid_str, np.nan, inplace=True)
+        df.dropna(axis=0, how='all', inplace=True)
+        df = self._value_scale_by_column_name(df)
         matches = self._column_match(df, category)
         df.rename(columns=matches, inplace=True)
-        self.column_select_i(df)
+
+        df = self.column_select(df)
+        return df
 
     # region column name regular
     @staticmethod
@@ -248,9 +261,22 @@ class _DataWasher:
             name = name.replace(*pair)
         return name
 
+    @staticmethod
+    def _value_scale_by_column_name(df: pd.DataFrame):
+        for col in df:
+            if '万元' in col:
+                df = numeric(df, col)
+                df[col] = df[col] * 10000
+            elif '率' in col or '%' in col:
+                df = numeric(df, col)
+                df[col] = df[col] / 100
+            elif '元' in col:
+                df = numeric(df, col)
+        return df
+
     def _column_match(self, df: pd.DataFrame, category=''):
         """match columns of df to table<field_mapper.csv>'s standard name"""
-        if category != '' and category in self.matched:
+        if category != '' and category in self.matched and self.matched[category]:
             return self.matched[category]
         matches = {}
         for col_name in df:
@@ -271,21 +297,22 @@ class _DataWasher:
                     self.mapper.to_csv('D:/field_mapper.csv', encoding=GBK)
             else:
                 if np.all(col != self.mapper['field']):
-                    print(category, col_name, 'column has no match')
+                    if col_name not in ['index']:
+                        print(category, col_name, 'column has no match')
 
         duplicate = {}
         for col in matches:
             field = matches[col]
             duplicate[field] = count = 0 if field not in duplicate else duplicate[field] + 1
             if count > 0 and col != field:
-                print('Duplicated column %s: %s -> %s' % (count, col, field))
+                print('Duplicated column %s: %s of %s' % (count, col, field))
                 matches[col] += '%s%s%s' % (self.DUPLICATE_SEPARATOR, count, self.DUPLICATE_FLAG)
         if category != '':
             self.matched[category] = matches
             obj2file(self.match_path, self.matched)
         return matches
 
-    def column_select_i(self, df):
+    def column_select(self, df):
         keys = {}
         cols_id = [[x.split(self.DUPLICATE_SEPARATOR)[0], x] for x in df.columns]
         for idx, col in cols_id:
@@ -302,7 +329,8 @@ class _DataWasher:
                     if field in df:
                         df.drop(field, axis=1, inplace=True)
                 elif idx != field:
-                    column_compare_choose_i(df, idx, field)
+                    column_compare_choose_i(df, idx, field, flag=f"{idx} vs {field}")
+        return df
 
     # endregion
 
@@ -328,18 +356,6 @@ class _DataWasher:
                 print(new_alias)
 
     # endregion
-
-    @staticmethod
-    def value_scale_by_column_name(df: pd.DataFrame):
-        for col in df:
-            if '万元' in col:
-                numeric_i(df, col)
-                df[col] *= 10000
-            elif '率' in col or '%' in col:
-                numeric_i(df, col)
-                df[col] /= 100
-            elif '元' in col:
-                numeric_i(df, col)
 
     # noinspection PyTypeChecker
     @staticmethod
@@ -413,8 +429,8 @@ class _DataWasher:
         return ttm
 
     @staticmethod
-    def calc_change_i(df: pd.DataFrame):
-        numeric_i(df, ['close'])
+    def calc_change(df: pd.DataFrame):
+        df = numeric(df, ['close'])
         pre_close = df['close'].values
         pre_close = np.insert(pre_close, 0, np.nan)
         pre_close = pre_close[0:len(pre_close) - 1]
@@ -429,6 +445,41 @@ class _DataWasher:
 
         pre_close = 'derc_close' if 'derc_close' in df else 'close'
         df['change_rate'] = df[pre_close].rolling(2).apply(ratio)
+        return df
+
+    @staticmethod
+    def fill_derc(df: pd.DataFrame):
+        if 'derc_close' not in df and 'backward_right_price' in df:
+            df['derc_close'] = df['backward_right_price']
+
+        cols = ['derc_close', 'close', 'high', 'low', 'open']
+        df = numeric(df, cols)
+        df['factor'] = df['derc_close'] / df['close']
+        # using backward fill to complete major derc factors
+        df['factor'].fillna(method='bfill', inplace=True)
+        # and forward fill for recently missing
+        df['factor'].fillna(method='ffill', inplace=True)
+        df['i_close'] = df.close * df.factor
+        df['i_high'] = df.high * df.factor
+        df['i_low'] = df.low * df.factor
+        df['i_open'] = df.open * df.factor
+        return df
+
+    @staticmethod
+    def all_lines_fill_derc(category='stock', code_list=[]):
+        if category not in ['stock', 'lines']:
+            print(category, 'can not fill derc')
+            return
+        code_list = code_list if code_list else DMGR.code_list
+
+        def fill(code):
+            df = DMGR.read(category, code)
+            if df is None or df.empty:
+                return
+            df = DWASH.fill_derc(df)
+            DMGR.save(df, category, code)
+
+        loop(fill, code_list, flag='stock_line_derc_fill', num_process=7)
 
 
 DWASH = _DataWasher()

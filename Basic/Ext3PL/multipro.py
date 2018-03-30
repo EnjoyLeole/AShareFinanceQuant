@@ -7,9 +7,13 @@ from pathos.multiprocessing import ProcessingPool as Pool
 
 from Basic.IO import obj2file
 
-DEBUG = False
-
+MULTI_DEBUG = False
 MULTIPROCESS_FAILURE_FILE = lambda flag: 'D:/%s.txt' % flag
+
+
+def force_debug():
+    global MULTI_DEBUG
+    MULTI_DEBUG = True
 
 
 def put_failure_path(func):
@@ -19,7 +23,7 @@ def put_failure_path(func):
 
 def loop(func, para_list, num_process=1, flag='', times=1, delay=0, show_seq=True, limit=-1,
          if_debug=False):
-    if_debug = if_debug if if_debug else DEBUG
+    if_debug = if_debug if if_debug else MULTI_DEBUG
 
     def _process(arr):
         pid = os.getpid()
@@ -59,7 +63,7 @@ def loop(func, para_list, num_process=1, flag='', times=1, delay=0, show_seq=Tru
 
     if limit > 0:
         para_list = para_list[0:limit]
-    if num_process <= 1:
+    if num_process <= 1 or if_debug:
         final_result, failures = _process(para_list)
     else:
         num_process = min(num_process, len(para_list))

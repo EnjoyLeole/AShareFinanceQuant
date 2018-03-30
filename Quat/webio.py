@@ -6,11 +6,13 @@ tushare offers macro economic data
 """
 
 import json
+from datetime import timedelta
 
 import tushare as ts
 import yahoo_finance as yf
 from urllib3 import PoolManager
 
+from Basic.Util import DATE_SEPARATOR, date_of
 from .dataio import *
 
 
@@ -43,7 +45,7 @@ class WebCrawler:
 
     @classmethod
     def finance(cls):
-        DMGR.loop_stocks(N163.override_finance, 'financial_override', num_process=12)
+        DMGR.loop_stocks(N163.override_finance, 'financial_override', num_process=8)
 
     @classmethod
     def stock(cls):
@@ -83,7 +85,11 @@ class N163(object):
 
     @classmethod
     def override_finance(cls, code):
-        for cate in cls.url_finance:
+        def fetch_cate(cate):
+            # if file_just_modified(DMGR.feather_path(cate, code), 8):
+            #     print(cate, code, 'file already updated')
+            #     return
+
             url = cls.url_finance[cate] % code
             # print(url)
             df = pd.read_csv(url, encoding=GBK)
@@ -91,11 +97,15 @@ class N163(object):
             # DWash.replaceI(df, '--', 0)
             df.dropna(1, 'all', inplace=True)
             df = df.T.reset_index()
-            DWASH.raw_regular_i(df, 'raw_finance_' + cate)
+            df = DWASH.raw_regular(df, 'raw_finance_' + cate)
             df.rename(columns={
                 "index": "date"}, inplace=True)
-            DMGR.save(df, cate, code)
-        print("%s saved" % code)
+            DMGR.save(df, cate, code, if_object2str=True)
+
+        for category in cls.url_finance:
+            # if category == 'income':
+            fetch_cate(category)
+        print("%s processed" % code)
 
     @classmethod
     def fetch_stock_combined_his(cls, code, start, end=None):
@@ -115,7 +125,8 @@ class N163(object):
         else:
             df = his
         df.sort_values('date', inplace=True)
-        DWASH.calc_change_i(df)
+        df = DWASH.calc_change(df)
+        df = DWASH.fill_derc(df)
         return df
 
     @classmethod
@@ -171,7 +182,7 @@ class N163(object):
         if df.shape[0] == 0:
             return None
         flag = 'index_tick' if index else 'hist_tick'
-        DWASH.raw_regular_i(df, flag)
+        df = DWASH.raw_regular(df, flag)
         df.sort_values('date', inplace=True)
         return df
 
@@ -184,7 +195,7 @@ class N163(object):
                 df = DMGR.read(category, code)
             if df is None:
                 return
-            DWASH.calc_change_i(df)
+            df = DWASH.calc_change(df)
             DMGR.save(df, category, code)
 
         loop(combine, code_list, category)
@@ -217,7 +228,7 @@ class N163(object):
 
                 df.loc[key, 'derc_close'] = df.loc[key, 'close'] * last_factor
             last_factor = df.loc[key, 'factor'] = df.loc[key, 'derc_close'] / df.loc[key, 'close']
-        DWASH.calc_change_i(df)
+        df = DWASH.calc_change(df)
         return df
 
 
@@ -287,7 +298,7 @@ class Tuget(object):
             'rzye':   'sum',
             'rqye':   'sum',
             'rzrqye': 'sum'})
-        DMGR.save(mar, 'macro', 'margin')
+        DMGR.save(mar, 'macro', 'margin', if_object2str=True)
 
     @classmethod
     def override_shibor(cls):
@@ -299,7 +310,7 @@ class Tuget(object):
                 break
             shibor = pd.concat([shibor, table])
             start += 1
-        DMGR.save(shibor, 'macro', 'shibor')
+        DMGR.save(shibor, 'macro', 'shibor', if_object2str=True)
 
     @classmethod
     def override_macros(cls):
@@ -384,7 +395,7 @@ class Tuget(object):
         for element in my_dict:
             method = getattr(ts, my_dict[element])
             df = method()
-            DMGR.save(df, name, element)
+            DMGR.save(df, name, element, if_object2str=True)
 
     @classmethod
     def _money_supply_month_clean(cls):
@@ -401,7 +412,7 @@ class Tuget(object):
             m2.ix[key, 'month'] = year + '-' + month
 
         print(m2['month'])
-        DMGR.save(m2, *index)
+        DMGR.save(m2, *index, if_object2str=True)
 
 
 class Yahoo(object):

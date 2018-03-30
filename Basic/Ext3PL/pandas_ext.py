@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 
+from Basic.Util import print_num
 from Basic.Util.mydatetime import INTERVAL_TRANSFER
 
 DUPLICATE_FLAG = '_d'
@@ -14,7 +15,7 @@ def column_duplicate_remove_i(df):
     df.drop(duplicates, axis=1, inplace=True)
 
 
-def column_compare_choose_i(df, origin, dual_key):
+def column_compare_choose_i(df, origin, dual_key, flag=''):
     rename = lambda x: df.rename(columns=x, inplace=True)
     winner = []
 
@@ -32,9 +33,9 @@ def column_compare_choose_i(df, origin, dual_key):
 
     dual = df[dual_key]
     if isinstance(dual, pd.DataFrame):
-        raise Exception('%s has multiple columns, Should handle before!' % dual_key)
+        raise Exception(f'{flag} %s has multiple columns, Should handle before!' % dual_key)
 
-    numeric_i(df, [origin, dual_key])
+    df = numeric(df, [origin, dual_key])
     org_count = (df[origin] != 0).sum()
     dual_count = (df[dual_key] != 0).sum()
 
@@ -43,8 +44,8 @@ def column_compare_choose_i(df, origin, dual_key):
     diff = org_sum - dual_sum
     max_sum = max(org_sum, dual_sum)
     diff_rate = diff / max_sum if max_sum > 0 else 0
-
-    if (org_count > 0 and dual_count == 0) or diff_rate < 0.001:
+    sig_level = 0.001
+    if (org_count > 0 and dual_count == 0) or diff_rate < sig_level:
         __chose_origin()
     elif org_count == 0 and dual_count > 0:
         __chose_dual()
@@ -54,24 +55,29 @@ def column_compare_choose_i(df, origin, dual_key):
         else:
             __chose_dual()
     else:
-        def validate(series):
-            if series[origin] != series[dual_key] and series[origin] != 0 and series[dual_key] != 0:
-                return 1
-            return 0
-
-        unequal_num = df.apply(validate, axis=1).sum()
-        if unequal_num / df.shape[0] > WARNING_LEVEL:
-            print('Inconsistent for %s bigger than %s with %s in %s / %s records' % (
-                origin, dual_key, diff_rate, unequal_num, df.shape[0]))
-
-        if org_count > dual_count:
-            if diff < 0:
-                print('Warning!org %s %s dual %s %s' % (org_count, org_sum, dual_count, dual_sum))
+        if org_sum<sig_level:
+            __chose_dual()
+        elif dual_sum<sig_level:
             __chose_origin()
         else:
-            if diff > 0:
-                print('Warning!org %s %s dual %s %s' % (org_count, org_sum, dual_count, dual_sum))
-            __chose_dual()
+            def validate(series):
+                if series[origin] != series[dual_key] and series[origin] != 0 and series[dual_key] != 0:
+                    return 1
+                return 0
+
+            unequal_num = df.apply(validate, axis=1).sum()
+            if unequal_num / df.shape[0] > WARNING_LEVEL:
+                print(flag, 'Inconsistent for %s bigger than %s with %s in %s / %s records' % (
+                    origin, dual_key, diff_rate, unequal_num, df.shape[0]))
+
+            if org_count > dual_count:
+                if diff < 0:
+                    print_num(flag, 'Warning!', org_count, org_sum, 'vs', dual_count, dual_sum)
+                __chose_origin()
+            else:
+                if diff > 0:
+                    print_num(flag, 'Warning!', org_count, org_sum, 'vs', dual_count, dual_sum)
+                __chose_dual()
 
     return winner
 
@@ -90,6 +96,7 @@ def fill_miss(df, refer_indexes, brief_col='quarter', if_labeling_filled=True):
 
 
 def truncate_period(df, truncate_val, truncate_col='quarter'):
+    """ set the value of truncate point to the last,(to prepare for further merge) """
     df.sort_values(truncate_col, inplace=True)
     last = df.iloc[-1]
     if last[truncate_col] != truncate_val:
@@ -146,20 +153,24 @@ def brief_detail_merge(brief, detail, if_reduce2brief=False, brief_col='quarter'
     return df
 
 
-def numeric_i(df: pd.DataFrame, include=None, exclude=None):
-    if include is None:
-        include = []
-    if exclude is None:
-        exclude = []
-    include = df if len(include) == 0 else include
-    include = [include] if not isinstance(include, list) else include
+def numeric(df: pd.DataFrame, include=None, exclude=None):
+    exclude = exclude if exclude else []
+    if include:
+        if not isinstance(include, list):
+            include = [include]
+    else:
+        include = df.columns.values
+    # include = [include] if not isinstance(include, list) else include
+    df = df.dropna(axis=0, how='all')
     for col in include:
         if col not in exclude and df[col].dtype in [object, str]:
             try:
-                df[col] = df[col].astype(np.float64)  # print('simple')
+                df[col] = df[col].astype(np.float64)
             except ValueError as e:
-                print('nmeric_i',e)
-                df[col] = df[col].apply(__to_num)
+                print('numeric', col, df.shape, e)
+                force = df[col].apply(__to_num)
+                df[col] = force
+    return df
 
 
 def __to_num(val):

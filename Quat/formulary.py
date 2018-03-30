@@ -10,6 +10,10 @@ from functools import reduce
 
 import numba
 
+from Basic.Ext3PL import brief_detail_merge, column_duplicate_remove_i, fill_miss, idx_by_quarter, \
+    minus_verse, normal_test, reduce2brief, truncate_period
+from Basic.Util import ClassProperty, INTERVAL_ORDER, SingletonMeta, now, quarter_range, \
+    std_date_str
 from .dataio import *
 
 KPI = 'kpi'
@@ -113,6 +117,13 @@ class _FinancialFormula(metaclass=SingletonMeta):
         'year':    5,
         'quarter': 2}
 
+    @staticmethod
+    def drop_tick_target(df):
+        for idx in FORMULA.sub_targets[TICK]:
+            if idx in df:
+                df = df.drop(idx, axis=1)
+        return df
+
     def __init__(self):
         # get table-field relation pairs for further use, table of *_indicator excluded
         self._table_fields = {row.field: row.table for i, row in DWASH.mapper.iterrows() if
@@ -189,10 +200,12 @@ class _FinancialFormula(metaclass=SingletonMeta):
         :param target_calculator: callback func to get the target from upper level object
         :return: series contains formula result
         """
+
         if_debug = False
         target = formula.target
-        if target in data:
-            return data[target]
+
+        # if target in data:
+        #     return data[target]
 
         def _prelude():
             """ prepare fields and corresponding columns from formula
@@ -200,6 +213,7 @@ class _FinancialFormula(metaclass=SingletonMeta):
             """
             pre_eqt = formula.equation
             pre_fields = self.eqt_paras[formula.target]
+
             if if_debug:
                 print(formula.target)
             if prelude != prelude:
@@ -232,6 +246,7 @@ class _FinancialFormula(metaclass=SingletonMeta):
                 'cash_flow':    ttm}
             num_quarters = self.STD_DURATION[prelude]
             new_fields = []
+            # print(target, pre_eqt, pre_fields, data_source.shape)
             for field in pre_fields:
                 if field in new_fields:
                     continue
@@ -245,6 +260,7 @@ class _FinancialFormula(metaclass=SingletonMeta):
                         tb2prelude[table](data, field, new_field, num_quarters)
                     new_fields.append(new_field)
                     pre_eqt = pre_eqt.replace(field, new_field)
+
             return pre_eqt, new_fields
 
         eqt, fields = _prelude()
@@ -252,28 +268,21 @@ class _FinancialFormula(metaclass=SingletonMeta):
             return None
         if if_debug:
             print(data[fields])
+
         eqt_series = data.eval(eqt, parser='pandas')
         if formula.finale != formula.finale:
             result = eqt_series
         else:
             window_size = int(formula.quarter) if formula.source != TICK else int(
-                    formula.quarter * 90)
+                    formula.quarter * 60)
             result = eqt_series.rolling(window_size).apply(self.REDUCE_METHODS[formula.finale])
         return result
-
-    @staticmethod
-    def drop_tick_target(df):
-        for idx in FORMULA.sub_targets[TICK]:
-            if idx in df:
-                df = df.drop(idx, axis=1)
-        return df
 
 
 FORMULA = _FinancialFormula()
 
 
 class Ticks(object):
-    If_Renew = False
     DATA_SOURCE = ''
 
     @property
@@ -288,10 +297,10 @@ class Ticks(object):
     def last_quarter(self):
         return self.report['quarter'].iloc[-1]
 
-    def __init__(self, code, table_getter: callable, refer_index=None):
+    def __init__(self, code, table_getter: callable, refer_index=None, if_renew=False):
         def raw_data_retrieve():
             report, tick = table_getter()
-            if report is None or report.shape[0] == 0 or tick is None or tick.shape[0] == 0:
+            if report is None or report.empty or tick is None or tick.shape[0] == 0:
                 print('%s %s do not have data!' % (self.DATA_SOURCE, code))
                 self.non_data = True
                 return None, None
@@ -301,15 +310,7 @@ class Ticks(object):
 
             return report, tick
 
-        def saved_target_retrieve():
-            targets_table = DMGR.read(self.target_source, code)
-            if targets_table is None or self.If_Renew:
-                targets_table = pd.DataFrame(index=self.report.index)
-                targets_table['quarter'] = targets_table.index
-            else:
-                targets_table.index = targets_table.quarter
-            return targets_table
-
+        self.if_renew = if_renew
         self.code = code
 
         self.refer_index = refer_index
@@ -325,12 +326,13 @@ class Ticks(object):
         self.major = pd.merge(self.report, reduced, on='quarter', how='left')
         self.major.index = self.major.quarter
 
-        if self.If_Renew:
+        if self.if_renew:
             self.tick = FORMULA.drop_tick_target(self.tick)
         else:
-            targets = saved_target_retrieve()
-            self.major = pd.merge(self.major, targets, on='quarter', how='left')
-            self.major.index = self.major.quarter
+            targets = DMGR.read(self.target_source, code)
+            if targets is not None and not targets.empty:
+                self.major = pd.merge(self.major, targets, on='quarter', how='left')
+                self.major.index = self.major.quarter
 
     def calc_list(self, target_list=None):
         if self.non_data:
@@ -340,19 +342,20 @@ class Ticks(object):
             self.calc_target(target=target)
 
     def calc_target(self, formula=None, target: str = None, prelude=np.nan):
+
         if self.non_data:
             return None
         if formula is None and target is None:
             raise Exception(' not specified at %s %s' % (self.DATA_SOURCE, self.code))
-        if formula is not None:
+        if formula:
             target = formula.target
 
-        if not self.If_Renew and target in self.major:
-            return None
+        if target in self.major:
+            return self.major[target]
         if target.endswith(PERCENTILE) and target not in self.major:
             print(self.code, 'no percentile data', target)
             return None
-        formula = FORMULA.table.loc[target] if formula is None else formula
+        formula = formula if formula else FORMULA.table.loc[target]
         prelude = formula.prelude if prelude != prelude else prelude
         target_calculator = lambda tar: self.calc_target(target=tar)
         if formula.source == TICK:
@@ -379,18 +382,28 @@ class Ticks(object):
                 # df = fill_miss(ref, self.major.index, ifLabelingFilled = False)
                 result = ref[target]
             else:
+
                 result = FORMULA.calculate(self.major, formula, prelude, target_calculator)
 
         self.major[target] = result
         return result
 
     def save_targets(self, if_tick=True):
-        if not self.non_data:
-            cols = [x for x in FORMULA.target_savings if x in self.major]
-            targets = self.major[cols]
-            DMGR.save(targets, self.target_source, self.code)
-            if if_tick:
-                self.save_ticks()
+        if self.non_data:
+            return
+        cols2save = [x for x in FORMULA.target_savings if x in self.major]
+        targets = self.major[cols2save]
+        if self.if_renew:
+            # for renew, must read existed targets to avoid lost data
+            old_targets = DMGR.read(self.target_source, self.code)
+            if old_targets is not None and not old_targets.empty:
+                cols2drop = [col for col in cols2save if col in old_targets]
+                old_targets.drop(cols2drop, axis=1, inplace=True)
+                targets = pd.merge(targets, old_targets, left_index=True, right_on='quarter',
+                                   how='left')
+        DMGR.save(targets, self.target_source, self.code)
+        if if_tick:
+            self.save_ticks()
 
     def save_ticks(self):
         DMGR.save(self.tick, self.DATA_SOURCE, self.code)
@@ -406,7 +419,7 @@ class Indexes(Ticks):
             self._hs300 = Indexes(*INDEX_DICT['HS300'])
         return self._hs300
 
-    def __init__(self, label, code, if_update=False):
+    def __init__(self, label, code, if_renew=False):
         def __get_table():
             tick = DMGR.read('index', self.code)
             column_duplicate_remove_i(tick)
@@ -415,7 +428,7 @@ class Indexes(Ticks):
                     tick.drop(col, axis=1, inplace=True)
             tick.sort_values('date', inplace=True)
             tick.date = tick.date.apply(date_str2std)
-            if if_update:
+            if if_renew:
                 report = DMGR.update_file('index', self.elements_quarter,
                                           self._fetch_element_report, index='quarter')
 
@@ -436,7 +449,7 @@ class Indexes(Ticks):
         self.elements_daily = code + '_daily'
         self.elements_quarter = code + '_quarterly'
 
-        super().__init__(code, __get_table, )
+        super().__init__(code, __get_table, if_renew=if_renew)
 
     def _fetch_element_report(self, start_date):
         all_fina = DMGR.category_concat(self.code_list, 'income', ['net_profit'], start_date)
@@ -461,17 +474,27 @@ class Indexes(Ticks):
         return all_ticks
 
 
+def default_list(func):
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
 class Stocks(Ticks):
     DATA_SOURCE = 'stock'
     TICK_SOURCE = 'lines'
     SIMPLE_COLUMNS = ['date', 'quarter', 'open', 'high', 'low', 'close', 'factor', 'derc_close',
                       'volume', 'market_cap']
-    ACTIVE_TIME_LINE = std_date_str(today().year, 1, 1)
+    ACTIVE_TIME_LINE = std_date_str(today().year - 2, 1, 1)
 
     @classmethod
     def simplify_line(cls, code):
         df = DMGR.read('stock', code)
-        if df is None or df.shape[0] == 0 or date_str2std(df.iloc[-1].date) < cls.ACTIVE_TIME_LINE:
+        if df is None or df.empty:
+            return
+        if date_str2std(df.iloc[-1].date) < cls.ACTIVE_TIME_LINE:
+            print(code, f'last tick older than {cls.ACTIVE_TIME_LINE}, abort')
             return
         ticks = [x for x in FORMULA.sub_targets[TICK] if x in df]
         # if 'derc_close' not in df:
@@ -480,11 +503,13 @@ class Stocks(Ticks):
         DMGR.save(df, 'lines', code)
 
     @classmethod
-    def simplify_all_lines(cls):
-        DMGR.loop_stocks(cls.simplify_line, 'simple_line')
+    @default_list
+    def simplify_all_lines(cls, code_list=None):
+        loop(cls.simplify_line, code_list, flag='simple_lines', num_process=7)
+        # DMGR.loop_stocks(cls.simplify_line, 'simple_line')
 
     @classmethod
-    def target_pipeline(cls, target_list):
+    def target_pipeline(cls, target_list=None):
         cls.targets_calculate(target_list)
         cls.targets_stock2cluster(target_list)
         cls.targets_cluster2stock(target_list)
@@ -493,21 +518,19 @@ class Stocks(Ticks):
 
     @classmethod
     def targets_calculate(cls, target_list=None, code_list=None):
-        target_list = FORMULA.sub_targets[KPI] if target_list is None else target_list
-        code_list=code_list if code_list else DMGR.code_list
+        target_list = target_list if target_list else FORMULA.sub_targets[KPI]
+        code_list = code_list if code_list else DMGR.code_list
+
         def calc(code):
-            # if os.path.getmtime(DMgr.csv_path('stock_target', code)) >= datetime(2018, 3, 18, 23,
-            #         0).timestamp():
-            #     print('%s jumped' % code)
-            #     return
             stk = Stocks(code)
             stk.calc_list(target_list)
             stk.save_targets()
 
-        loop(calc, code_list, flag='target_calc', num_process=5,if_debug=False)
+        loop(calc, code_list, flag='target_calc', num_process=5, if_debug=False)
 
     @classmethod
-    def targets_stock2cluster(cls, target_list):
+    def targets_stock2cluster(cls, target_list=None, code_list=None):
+        target_list = target_list if target_list else FORMULA.sub_targets[KPI]
         all_quarters = quarter_range()
 
         sort_method = {
@@ -580,13 +603,13 @@ class Stocks(Ticks):
         loop(cluster_stat, target_list, num_process=n, flag='cluster_target_stat')
 
     @classmethod
-    def targets_cluster2stock(cls, target_list, code_list=None):
+    def targets_cluster2stock(cls, target_list=None, code_list=None):
         """save market-wide statistic result back to stocks' target table
         :return:
         """
-
-        target_dfs = DMGR.read2dict('cluster_target', target_list, idx_by_quarter)
+        target_list = target_list if target_list else FORMULA.sub_targets[KPI]
         code_list = DMGR.code_list if code_list is None else code_list
+        target_dfs = DMGR.read2dict('cluster_target', target_list, idx_by_quarter)
 
         def cluster_separate_by_code(code):
             comb = pd.DataFrame()
@@ -604,6 +627,9 @@ class Stocks(Ticks):
                 return
             comb['quarter'] = comb.index
             df = DMGR.read('stock_target', code)
+            if df is None or df.empty:
+                print(code, 'does not have targets and abort!')
+                return
             df = pd.merge(df, comb, on='quarter', how='left')
             DMGR.save(df, 'stock_target', code)
 
@@ -633,7 +659,7 @@ class Stocks(Ticks):
 
     # endregion
 
-    def __init__(self, code):
+    def __init__(self, code, if_renew=False):
         def __get_table():
             report = None
             for table in ['balance', 'cash_flow', 'income']:
@@ -641,7 +667,7 @@ class Stocks(Ticks):
                 if df is not None:
                     df['quarter'] = df['date'].apply(to_quarter)
                     dup = df[df['quarter'].duplicated()]
-                    if dup.shape[0] > 0:
+                    if not dup.empty:
                         print(self.code, table, 'has duplicate index! Dropped!')
                         df.drop_duplicates('quarter', inplace=True)
                     # noinspection PyComparisonWithNone
@@ -653,22 +679,23 @@ class Stocks(Ticks):
                             '', DWASH.DUPLICATE_SEPARATOR + table + DWASH.DUPLICATE_FLAG))
                 else:
                     return None, None
-            if report is not None and report.shape[0] > 0:
-                DWASH.column_select_i(report)
+            if report is not None and not report.empty:
+                report = DWASH.column_select(report)
                 report.index = report.quarter
                 report.sort_index(inplace=True)
+                report = numeric(report, exclude=['quarter', 'date'])
 
             tick = DMGR.read(self.TICK_SOURCE, code)
             if tick is not None:
                 # hopefully only once, but actually have to keep
                 tick = tick.drop_duplicates(subset='date', keep='first')
                 tick = tick[tick.close != 0]
-                DWASH.calc_change_i(tick)
+                tick = DWASH.calc_change(tick)
                 tick.sort_values('date', inplace=True)
 
             return report, tick
 
-        super().__init__(code, __get_table, Indexes.hs300)
+        super().__init__(code, __get_table, Indexes.hs300, if_renew=if_renew)
 
     def save_ticks(self):
         DMGR.save(self.tick, self.TICK_SOURCE, self.code)
