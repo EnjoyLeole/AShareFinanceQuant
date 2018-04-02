@@ -91,7 +91,7 @@ class N163(object):
             #     return
 
             url = cls.url_finance[cate] % code
-            # print(url)
+            print(url)
             df = pd.read_csv(url, encoding=GBK)
             df.set_index(df.columns[0], inplace=True)
             # DWash.replaceI(df, '--', 0)
@@ -261,6 +261,43 @@ class Tuget(object):
         ts.new_stocks()  # 新股
         ts.xsg_data()  # 限售解禁
 
+    @classmethod
+    def override_code_list(cls):
+        """Renew stock list including basic info
+        code,代码
+        name,名称
+        industry,所属行业
+        area,地区
+        pe,市盈率
+        outstanding,流通股本
+        totals,总股本(万)
+        totalAssets,总资产(万)
+        liquidAssets,流动资产
+        fixedAssets,固定资产
+        reserved,公积金
+        reservedPerShare,每股公积金
+        eps,每股收益
+        bvps,每股净资
+        pb,市净率
+        timeToMarket,上市日期"""
+        # 股票基本信息列表
+        stock_basic = ts.get_stock_basics()
+        print('code list override')
+        DMGR.save_csv(stock_basic, '', 'code_list_backup', index=True)
+        return stock_basic  # 每次必须重新覆盖
+
+    @classmethod
+    def code_list_merge(cls):
+        uber = DMGR.read_csv('', 'code_list')
+        uber = uber[uber.listStatusCD != 'DE']
+        tu = DMGR.read_csv('', 'code_list_backup')
+        tu = tu[['code', 'industry', 'area', 'timeToMarket', 'holders']]
+        uber['code'] = uber['code'].apply(lambda val: str(val).zfill(6))
+        tu['code'] = tu['code'].apply(lambda val: str(val).zfill(6))
+        # tu.index=tu.code
+        df = pd.merge(uber, tu, on='code', how='right')
+        DMGR.save_csv(df, '', 'my_code_list')
+
     #  noinspection SpellCheckingInspection
     @classmethod
     def override_margins(cls):
@@ -338,31 +375,6 @@ class Tuget(object):
                 print(e)
                 break
         DMGR.save(sd, 'macro', 'share_div')
-
-    @classmethod
-    def fetch_code_list(cls):
-        """Renew stock list including basic info
-        code,代码
-        name,名称
-        industry,所属行业
-        area,地区
-        pe,市盈率
-        outstanding,流通股本
-        totals,总股本(万)
-        totalAssets,总资产(万)
-        liquidAssets,流动资产
-        fixedAssets,固定资产
-        reserved,公积金
-        reservedPerShare,每股公积金
-        eps,每股收益
-        bvps,每股净资
-        pb,市净率
-        timeToMarket,上市日期"""
-        # 股票基本信息列表
-        stock_basic = ts.get_stock_basics()
-        return stock_basic  # 每次必须重新覆盖  # self.db.table_save(  # stock_basic.sort(),
-
-    #  'stock_list',   # append =  #  False)  #   #  #  print(  # '股票列表已覆盖更新')
 
     @classmethod
     def fetch_his_factor(cls, code, start=None, end=None, recurrent_type=None):

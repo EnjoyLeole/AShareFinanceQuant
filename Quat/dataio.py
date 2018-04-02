@@ -10,12 +10,12 @@ import re
 import numpy as np
 import pandas as pd
 
-from Basic.Ext3PL import column_compare_choose_i, numeric
+from Basic.Ext3PL import column_compare_choose_inplace, numeric_inplace
 from Basic.Ext3PL.multipro import loop, put_failure_path
 from Basic.IO.file import ext, get_direct_files, obj2file
 from Basic.Util import QUARTER_SEPARATOR, date2str, date_str2std, max_at, quarter_add, str2date, \
     to_quarter, today, uid
-from Meta import DATA_ROOT, GBK, get_error_path, get_lib, lib_path
+from Meta import DATA_ROOT, GBK, get_error_path, get_lib, get_line_backup, lib_path
 
 OLDEST_DATE = '1988-01-01'
 
@@ -31,8 +31,9 @@ def code2symbol(code):
 
 
 class _DataManager:
-    CODE_LIST_PATH = DATA_ROOT + 'code_list.csv'
+    CODE_LIST_PATH = DATA_ROOT + 'my_code_list.csv'
     DATA_FOLDERS = {
+        '':               '',
         'indicator':      'financial_indicator',
         'balance':        'financial_balance',
         'cash_flow':      'financial_cash_flow',
@@ -127,6 +128,14 @@ class _DataManager:
 
         df.to_feather(path)
 
+    def read_csv(self, category, code):
+        csv_path = self.csv_path(category, code)
+        return pd.read_csv(csv_path, encoding=GBK)
+
+    def save_csv(self, df, category, code, index=False):
+        csv_path = self.csv_path(category, code)
+        df.to_csv(csv_path, index=index, encoding=GBK)
+
     @staticmethod
     def update_file(category, code, fetcher, index='date'):
         def __msg(*txt):
@@ -134,21 +143,22 @@ class _DataManager:
 
         exist = DMGR.read(category, code)
         # DWash.reform_tick(exist)
-        if exist is None:
+        if exist is None or exist.empty:
             exist = pd.DataFrame()
             start = OLDEST_DATE
         else:
             # todo hopefully only once
             exist[index] = exist[index].apply(date_str2std)
             exist = exist[exist[index] == exist[index]]
+            if exist.empty:
+                exist = pd.DataFrame()
+                start = OLDEST_DATE
+            else:
+                idx = exist[index]
 
-            # exist = exist[exist['derc_close'] == exist['derc_close']]
-
-            idx = exist[index]
-
-            if exist.shape[0] > 1 and idx[0] > idx[1]:
-                exist.sort_values(index, inplace=True)
-            start = exist[index].iloc[-1]
+                if exist.shape[0] > 1 and idx[0] > idx[1]:
+                    exist.sort_values(index, inplace=True)
+                start = exist[index].iloc[-1]
         if index == 'date':
             dist = today() - str2date(start).date()
             if dist.days <= 3:
@@ -159,7 +169,7 @@ class _DataManager:
 
         new = fetcher(start)
         if new is None:
-            __msg('Non Data')
+            __msg('Non Data Crawled')
             return exist
 
         __msg(start, len(new))
@@ -181,13 +191,13 @@ class _DataManager:
             df = self.read(category, code)
             if df is not None:
                 df = df[df.date >= start_date]
-                if df.shape[0] > 0:
+                if not df.empty:
                     df = df[['date', *columns]]
                     temp = getattr(self, tid)
                     temp = pd.concat([temp, df])
                     setattr(self, tid, temp)
 
-        loop(_concat_code, code_list, tid, show_seq=True)
+        loop(_concat_code, code_list, flag=tid, show_seq=True)
 
         return getattr(self, tid)
 
@@ -242,6 +252,7 @@ class _DataWasher:
         self.matched = {}
         # self.matched = file2obj(self.match_path)
 
+    # raw data regular
     def raw_regular(self, df: pd.DataFrame, category=''):
         for invalid_str in ['--', ' --', '', ' ', '\t\t']:
             df.replace(invalid_str, np.nan, inplace=True)
@@ -253,7 +264,6 @@ class _DataWasher:
         df = self.column_select(df)
         return df
 
-    # region column name regular
     @staticmethod
     def _simplify_name(name):
         swap_pair = [['所有者', '股东'], ['的', ''], ['所', '']]
@@ -265,13 +275,13 @@ class _DataWasher:
     def _value_scale_by_column_name(df: pd.DataFrame):
         for col in df:
             if '万元' in col:
-                df = numeric(df, col)
+                df = numeric_inplace(df, col)
                 df[col] = df[col] * 10000
             elif '率' in col or '%' in col:
-                df = numeric(df, col)
+                df = numeric_inplace(df, col)
                 df[col] = df[col] / 100
             elif '元' in col:
-                df = numeric(df, col)
+                df = numeric_inplace(df, col)
         return df
 
     def _column_match(self, df: pd.DataFrame, category=''):
@@ -329,7 +339,7 @@ class _DataWasher:
                     if field in df:
                         df.drop(field, axis=1, inplace=True)
                 elif idx != field:
-                    column_compare_choose_i(df, idx, field, flag=f"{idx} vs {field}")
+                    column_compare_choose_inplace(df, idx, field, flag=f"{idx} vs {field}")
         return df
 
     # endregion
@@ -354,6 +364,10 @@ class _DataWasher:
                 new_alias = match.group(1)
                 self.mapper.ix[row[0], 'alias'] = new_alias
                 print(new_alias)
+
+    def fill(self):
+        code = 1
+        df = get_line_backup(code)
 
     # endregion
 
@@ -430,7 +444,7 @@ class _DataWasher:
 
     @staticmethod
     def calc_change(df: pd.DataFrame):
-        df = numeric(df, ['close'])
+        df = numeric_inplace(df, ['close'])
         pre_close = df['close'].values
         pre_close = np.insert(pre_close, 0, np.nan)
         pre_close = pre_close[0:len(pre_close) - 1]
@@ -453,7 +467,7 @@ class _DataWasher:
             df['derc_close'] = df['backward_right_price']
 
         cols = ['derc_close', 'close', 'high', 'low', 'open']
-        df = numeric(df, cols)
+        numeric_inplace(df, cols)
         df['factor'] = df['derc_close'] / df['close']
         # using backward fill to complete major derc factors
         df['factor'].fillna(method='bfill', inplace=True)
@@ -466,7 +480,33 @@ class _DataWasher:
         return df
 
     @staticmethod
-    def all_lines_fill_derc(category='stock', code_list=[]):
+    def fill_miss_tick_from_backup(code_list=None):
+        def fill(code):
+            backup = get_line_backup(code)
+            if backup is None:
+                return
+            backup = DWASH.raw_regular(backup, 'backup')
+            backup.index = backup.date.apply(date_str2std)
+            df = DMGR.read('stock', code)
+            df.index = df['date']
+            missed = [x for x in backup.index if x not in df.index]
+            if not missed:
+                return
+            print(code, len(missed), 'missing lines')
+            miss_in_backup = backup.loc[missed]
+            for key, row in miss_in_backup.iterrows():
+                df.loc[key] = row
+            df.sort_index(inplace=True)
+            df = DWASH.fill_derc(df)
+
+            DMGR.save(df, 'stock', code)
+
+            # raise Exception('missed')
+
+        loop(fill, code_list, num_process=5, flag='fill_tick_missed')
+
+    @staticmethod
+    def all_lines_fill_derc(category='stock', code_list=None):
         if category not in ['stock', 'lines']:
             print(category, 'can not fill derc')
             return

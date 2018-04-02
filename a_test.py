@@ -1,10 +1,11 @@
 import itchat
 import numpy
 
+from Basic.Ext3PL import force_debug
 from Basic.IO import file2obj
 from Basic.Util import date_of
 from Quat.statistic import *
-from Quat.webio import N163, WebCrawler
+from Quat.webio import N163, WebCrawler, Tuget
 
 simples = {
     'letv':   '300104',
@@ -213,6 +214,10 @@ def numba(arr=li):
 
 
 # endregion
+def force():
+    force_debug()
+    FORMULA.If_Debug = True
+
 
 def wechat():
     itchat.auto_login()
@@ -256,12 +261,14 @@ def financial_expense_compare():
 
 
 def index_target_test(code='399300'):
-    id = Indexes('hs300', code)
-    id.calc_list()
+    idx = Indexes('hs300', '399300', if_update=False)
+    idx.calc_list()
+    idx.save_targets()
+    r = idx.quarter_performance()
 
 
 def stock_vector_test(code=hr, target=None):
-    stk = Stocks(code, if_renew=True)
+    stk = Stocks(code)
     if target is None:
         df_res = stk.calc_list()
         stk.save_targets()
@@ -281,34 +288,43 @@ def get_error_codes(f):
 
 def error_reshow(f):
     li = get_error_codes(f)
-
+    # Stocks.targets_cluster2stock(target_list=FORMULA.sub_targets[POLICY], code_list=li)
+    # DWASH.fill_miss_tick_from_backup(li)
     # DWASH.all_lines_fill_derc('lines',li)
-    def test(code):
-        df = DMGR.read('stock', code)
-        df = DWASH.fill_derc(df)
-        return df
-
-    Stocks.simplify_all_lines(li)
+    # def test(code):
+    #     df = DMGR.read('stock', code)
+    #     df = DWASH.fill_derc(df)
+    #     return df
+    #
+    # for c in li:
+    #     N163.update_stock_hist(c)
+    # Stocks.simplify_all_lines(li)
     # Stocks.targets_calculate(code_list=li)
-    # Stocks.targets_cluster2stock(code_list=li)
+    Stocks.targets_cluster2stock(code_list=li)
     # loop(stock_vector_test, li, 1, flag='error_reshow', if_debug=True)
 
 
 def test():
-    # stock_vector_test('000003')
-    from Basic.Ext3PL import force_debug
+    force()
+    Stocks.cluster_spread(FORMULA.sub_targets[KPI])
+    # error_reshow('cluster_separate')
+    # DWASH.fill_miss_tick_from_backup()
+    # df=DMGR.read('income','000009')
+    # df['quarter']=df.date.apply(to_quarter)
+    # numeric_inplace(df)
+    # df['ttm']=DWASH.ttm_column(df,'net_profit',n=2)
+    #
+    # print(df[['quarter','net_profit','ttm']])
 
-    force_debug()
+    # N163.override_finance(bcode)
+    # stock_vector_test('002035', 'MyFinancial')
 
-    error_reshow('cluster_separate')
-    # df_test()
-    # WebCrawler.finance()
-    # WebCrawler.stock()
-    # Stocks.simplify_lines()
-    # Stocks.target_pipeline(FORMULA.sub_targets[KPI])
-    # Stocks
-    # Stocks.cluster_spread(FORMULA.sub_targets[POLICY])
+    # Stocks.target_pipeline(['MyFinancial'])
+    # Stocks.targets_cluster2stock()
 
-    # Strategy.find_security()
+    # DMGR.feather2csv('stock_target', '600048')
+    # DMGR.feather2csv('cluster_target','MyFinancial')
+
+    # Strategy.find_security( )
 
     pass

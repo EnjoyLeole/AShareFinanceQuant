@@ -8,7 +8,7 @@ GBK = 'gbk'
 
 META_DIR = os.path.dirname(os.path.abspath(__file__)) + '\\'
 DATA_ROOT = 'C:\\StockData\\'
-
+BACKUP_DIR = META_DIR + 'Old\\lines\\'
 lib_path = {
     'mapper':  META_DIR + 'field_mapper.csv',
     'formula': META_DIR + 'formula.csv',
@@ -30,3 +30,12 @@ def get_error_path(name):
 def get_error_list(name):
     path = get_error_path(name)
     return file2obj(path)
+
+
+def get_line_backup(code):
+    prefix = 'sh' if code[0] == '6' else 'sz'
+    backup_file = BACKUP_DIR + prefix + code + '.csv'
+    if not os.path.exists(backup_file):
+        return None
+    df = pd.read_csv(backup_file, encoding=GBK)
+    return df

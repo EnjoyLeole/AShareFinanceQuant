@@ -10,12 +10,12 @@ WARNING_LEVEL = 1
 COMPARED_FLAG = 'Done'
 
 
-def column_duplicate_remove_i(df):
+def column_duplicate_remove_inplace(df):
     duplicates = [x for x in df if x.endswith(DUPLICATE_FLAG)]
     df.drop(duplicates, axis=1, inplace=True)
 
 
-def column_compare_choose_i(df, origin, dual_key, flag=''):
+def column_compare_choose_inplace(df, origin, dual_key, flag=''):
     rename = lambda x: df.rename(columns=x, inplace=True)
     winner = []
 
@@ -35,7 +35,7 @@ def column_compare_choose_i(df, origin, dual_key, flag=''):
     if isinstance(dual, pd.DataFrame):
         raise Exception(f'{flag} %s has multiple columns, Should handle before!' % dual_key)
 
-    df = numeric(df, [origin, dual_key])
+    numeric_inplace(df, [origin, dual_key])
     org_count = (df[origin] != 0).sum()
     dual_count = (df[dual_key] != 0).sum()
 
@@ -54,14 +54,15 @@ def column_compare_choose_i(df, origin, dual_key, flag=''):
             __chose_origin()
         else:
             __chose_dual()
-    else:
-        if org_sum<sig_level:
+    else:  # todo if count lower but sum much bigger
+        if org_sum < sig_level:
             __chose_dual()
-        elif dual_sum<sig_level:
+        elif dual_sum < sig_level:
             __chose_origin()
         else:
             def validate(series):
-                if series[origin] != series[dual_key] and series[origin] != 0 and series[dual_key] != 0:
+                if series[origin] != series[dual_key] and series[origin] != 0 and series[
+                    dual_key] != 0:
                     return 1
                 return 0
 
@@ -153,17 +154,17 @@ def brief_detail_merge(brief, detail, if_reduce2brief=False, brief_col='quarter'
     return df
 
 
-def numeric(df: pd.DataFrame, include=None, exclude=None):
+def numeric_inplace(df: pd.DataFrame, include=None, exclude=None):
     exclude = exclude if exclude else []
+    exclude += ['quarter', 'date', 'date_x', 'date_y']
     if include:
         if not isinstance(include, list):
             include = [include]
     else:
         include = df.columns.values
-    # include = [include] if not isinstance(include, list) else include
-    df = df.dropna(axis=0, how='all')
+    df.dropna(axis=0, how='all', inplace=True)
     for col in include:
-        if col not in exclude and df[col].dtype in [object, str]:
+        if col not in exclude and isinstance(df[col], pd.Series) and df[col].dtype in [object, str]:
             try:
                 df[col] = df[col].astype(np.float64)
             except ValueError as e:

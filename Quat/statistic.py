@@ -3,8 +3,13 @@
 Updater manage all raw data & calculate result behavior
 
 """
+
+import matplotlib.pyplot as plt
+
 from Basic.Util import print_num
 from .formulary import *
+
+PRICE_TAG = '_price'
 
 
 class Strategy:
@@ -53,24 +58,85 @@ class Strategy:
 
     @classmethod
     def find_security(cls, policy='PkuBook'):
+        price_change = DMGR.read('cluster_target', 'DercCloseChange')
+        price_change.index = price_change.quarter
+
         df = DMGR.read('cluster_target', policy + PERCENTILE)
         df.index = df.quarter
+        df = df[df.quarter > '2009Q2']
         df.drop('quarter', axis=1, inplace=True)
-        flag = df > 0.99
-        flag.replace(False, np.nan, inplace=True)
-        flag.dropna(axis=1, how='all', inplace=True)
-        quarter_count = flag.count(axis=1)
+        share = df > 0.99
+        share.replace(False, np.nan, inplace=True)
+        share.dropna(axis=1, how='all', inplace=True)
+        for code in share:
+            if code not in price_change:
+                share.drop(code, axis=1, inplace=True)
 
-        for key, row in flag.iterrows():
-            factor = quarter_count.loc[key]
-            flag.loc[key] = row / factor
-        print(flag.shape, quarter_count.shape)
+        share.fillna(0, inplace=True)
+        flag_codes = share.columns.values
+        quarter_count = share.count(axis=1)
 
-        print(flag)
-        for code in df:
-            pass
-        # last = df.iloc[-1]
-        # last = last.dropna()
-        # last = last.reset_index()
+        for quarter, row in share.iterrows():
+            factor = quarter_count.loc[quarter]
+            share.loc[quarter] = row / factor
+        print(share.shape, quarter_count.shape)
 
-        # print(df.shape[1], last.size, best)
+        for code in share:
+            if code in price_change:
+                # financial report release delay in one quarter, so buy in&out delay the same
+                share[code + PRICE_TAG] = price_change[code].shift(-1)
+
+        commission = 0.0001
+
+        def return_calc(row):
+            earn = 0
+            for code in flag_codes:
+                if row[code] == 0:
+                    continue
+                code_r = row[code + PRICE_TAG]
+                if code_r != code_r:
+                    print(code, row.name, 'do not have earn data!')
+                    code_r = 0
+                earn += row[code] * (code_r - commission)
+            return earn
+
+        r = share.apply(return_calc, axis=1)
+        draw_vs_benchmark(r)
+
+
+NON_RISK_RETURN = 0.01
+
+
+def cumulative_sharp(earns):
+    mean = earns.mean()
+    sd = earns.std()
+    sharp = (mean - NON_RISK_RETURN) / sd
+    cum_yield = (earns + 1).cumprod()
+    return cum_yield, sharp
+
+
+def draw_vs_benchmark(earn_series):
+    earn_col = 'yield'
+    benchmark_col = 'benchmark'
+    cum_yield = 'Policy'
+    cum_benchmark = 'HS300'
+    earn_series.name = earn_col
+    df = earn_series.reset_index()
+    df.index = df.quarter
+    df[benchmark_col] = Indexes.hs300.quarter_performance()
+    print(df[benchmark_col])
+    plt.close('all')
+
+    fig, ax = plt.subplots()
+
+    def draw_cum(yield_col, cum_col):
+        df[cum_col], my_sharp = cumulative_sharp(df[yield_col])
+        ax.plot(df[cum_col], label=f"{cum_col}  Sharp:{my_sharp:{4}.{2}}")
+
+    draw_cum(earn_col, cum_yield)
+    draw_cum(benchmark_col, cum_benchmark)
+
+    ax.set_xticklabels(df.index, rotation=45, fontsize=7)
+    plt.legend(loc='upper left', frameon=False)
+    plt.tight_layout()
+    plt.show()

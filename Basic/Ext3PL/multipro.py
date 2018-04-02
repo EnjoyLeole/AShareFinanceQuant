@@ -33,9 +33,9 @@ def loop(func, para_list, num_process=1, flag='', times=1, delay=0, show_seq=Tru
         for para in arr:
             if show_seq:
                 if isinstance(para, str):
-                    print(pid, count, flag, para)
+                    print('    ', pid, count, flag, para)
                 else:
-                    print(pid, count, flag, len(para))
+                    print('    ', pid, count, flag, len(para))
                 count += 1
 
             def get_val(i):
