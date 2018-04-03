@@ -6,6 +6,7 @@ import numpy as np
 from pathos.multiprocessing import ProcessingPool as Pool
 
 from Basic.IO import obj2file
+from Basic.Util.trick import func_name_from_stack
 
 MULTI_DEBUG = False
 MULTIPROCESS_FAILURE_FILE = lambda flag: 'D:/%s.txt' % flag
@@ -24,6 +25,7 @@ def put_failure_path(func):
 def loop(func, para_list, num_process=1, flag='', times=1, delay=0, show_seq=True, limit=-1,
          if_debug=False):
     if_debug = if_debug if if_debug else MULTI_DEBUG
+    caller = func_name_from_stack(-3) + flag
 
     def _process(arr):
         pid = os.getpid()
@@ -33,9 +35,9 @@ def loop(func, para_list, num_process=1, flag='', times=1, delay=0, show_seq=Tru
         for para in arr:
             if show_seq:
                 if isinstance(para, str):
-                    print('    ', pid, count, flag, para)
+                    print('    ', pid, count, caller, para)
                 else:
-                    print('    ', pid, count, flag, len(para))
+                    print('    ', pid, count, caller, len(para))
                 count += 1
 
             def get_val(i):
@@ -46,15 +48,15 @@ def loop(func, para_list, num_process=1, flag='', times=1, delay=0, show_seq=Tru
                         return func(para)
                     except TimeoutError as e:
                         if i == times - 1:
-                            print(flag, para, 'multiprocess timeout:', e)
-                            fails.append([flag, para])
+                            print(caller, para, 'multiprocess timeout:', e)
+                            fails.append([caller, para])
                         else:
                             if delay > 0:
                                 time.sleep(delay)
                             return get_val(i + 1)
                     except Exception as e:
-                        print(flag, para, 'multiprocess failures:', e)
-                        fails.append([flag, para])
+                        print(caller, para, 'multiprocess failures:', e)
+                        fails.append([caller, para])
 
             res = get_val(0)
             if res is not None:
@@ -74,5 +76,5 @@ def loop(func, para_list, num_process=1, flag='', times=1, delay=0, show_seq=Tru
         final_result = [r for x in outs for r in x[0]]
         failures = [f for x in outs for f in x[1]]
     if len(failures) > 0:
-        obj2file(MULTIPROCESS_FAILURE_FILE(flag), failures)
+        obj2file(MULTIPROCESS_FAILURE_FILE(caller), failures)
     return final_result

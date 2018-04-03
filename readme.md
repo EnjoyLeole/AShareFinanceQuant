@@ -9,10 +9,10 @@
 Updater.everything()
 </pre></code>
 
-* Calculation stock indicators 计算标的指标
+* Calculation update_stocks indicators 计算标的指标
 
-<pre><code>stock=Stocks('000678')
-df=stock.calc_list()
+<pre><code>update_stocks=Stocks('000678')
+df=update_stocks.calc_list()
 print(df)
 </pre></code>
 

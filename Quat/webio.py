@@ -31,8 +31,8 @@ class WebCrawler:
     def everything(cls):
         # raw data fetch
         cls.index()
-        cls.stock()
-        cls.finance()
+        cls.update_stocks()
+        cls.override_finances()
         cls.macro()
 
     # region raw data
@@ -44,16 +44,16 @@ class WebCrawler:
         Tuget.override_category()
 
     @classmethod
-    def finance(cls):
-        DMGR.loop_stocks(N163.override_finance, 'financial_override', num_process=8)
+    def override_finances(cls):
+        loop(N163.override_finance, DMGR.code_list, num_process=8)
 
     @classmethod
-    def stock(cls):
-        DMGR.loop_stocks(N163.update_stock_hist, 'stock_update', num_process=12)
+    def update_stocks(cls):
+        loop(N163.update_stock_hist, DMGR.code_list, num_process=12)
 
     @classmethod
     def index(cls):
-        DMGR.loop_index(N163.update_idx_hist, 'index_update', num_process=12)
+        loop(N163.update_idx_hist, DMGR.idx_list, num_process=12)
 
     # endregion
 

@@ -1,22 +1,25 @@
+# -*- coding: utf-8 -*-
 import itchat
 import numpy
+from sympy.physics.quantum.circuitplot import matplotlib
 
 from Basic.Ext3PL import force_debug
 from Basic.IO import file2obj
 from Basic.Util import date_of
 from Quat.statistic import *
-from Quat.webio import N163, WebCrawler, Tuget
+from Quat.webio import N163, WebCrawler
 
 simples = {
     'letv':   '300104',
     'zzd':    '002069',
     'bym':    '002570',
     'maotai': '600519'}
+wk = '000002'
+mt = '600519'
+pingan = '601318'
 hr = '600276'
 letv = '300104'
-mt = '600519'
 bcode = '000001'
-code = '300104'
 sts = '2018-01-01'
 end = '2018-01-20'
 quarter = '2017-3'
@@ -47,7 +50,7 @@ def idx_hit():
 
 
 def N163_test():
-    N163.fetch_stock_combined_his(code, start)
+    N163.fetch_stock_combined_his(bcode, start)
 
 
 def derc_test():
@@ -165,9 +168,8 @@ def reg_resolve_test(formula):
 
 # region formula
 def quarter_date_merge_test():
-    quart = DMGR.read('balance', code)
-    dat = DMGR.read('stock',
-                    code)
+    quart = DMGR.read('balance', bcode)
+    dat = DMGR.read('stock', bcode)
 
 
 def stock_test(field):
@@ -299,31 +301,25 @@ def error_reshow(f):
     # for c in li:
     #     N163.update_stock_hist(c)
     # Stocks.simplify_all_lines(li)
-    # Stocks.targets_calculate(code_list=li)
-    Stocks.targets_cluster2stock(code_list=li)
+    Stocks.targets_calculate(code_list=li)
+    # Stocks.targets_cluster2stock(code_list=li)
     # loop(stock_vector_test, li, 1, flag='error_reshow', if_debug=True)
 
 
 def test():
+    code='300072'
+    # print(matplotlib.matplotlib_fname())
+    # Graph.analysis(code)
     force()
-    Stocks.cluster_spread(FORMULA.sub_targets[KPI])
-    # error_reshow('cluster_separate')
-    # DWASH.fill_miss_tick_from_backup()
-    # df=DMGR.read('income','000009')
-    # df['quarter']=df.date.apply(to_quarter)
-    # numeric_inplace(df)
-    # df['ttm']=DWASH.ttm_column(df,'net_profit',n=2)
-    #
-    # print(df[['quarter','net_profit','ttm']])
+    # Stocks.targets_cluster2stock()
+    # error_reshow('targets_calculate')
 
     # N163.override_finance(bcode)
-    # stock_vector_test('002035', 'MyFinancial')
+    stock_vector_test('300072','AccrualRatio')
 
-    # Stocks.target_pipeline(['MyFinancial'])
-    # Stocks.targets_cluster2stock()
+    # Stocks.target_pipeline()
 
-    # DMGR.feather2csv('stock_target', '600048')
-    # DMGR.feather2csv('cluster_target','MyFinancial')
+    # DMGR.feather2csv('stock_target', '300072')
 
     # Strategy.find_security( )
 

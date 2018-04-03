@@ -30,6 +30,13 @@ def code2symbol(code):
     return code + '.' + tail
 
 
+def std_code_col_inplace(df):
+    if 'code' not in df:
+        print('code not in df!')
+        return
+    df['code'] = df['code'].apply(lambda val: str(val).zfill(6))
+
+
 class _DataManager:
     CODE_LIST_PATH = DATA_ROOT + 'my_code_list.csv'
     DATA_FOLDERS = {
@@ -48,11 +55,16 @@ class _DataManager:
         'index_target':   'target_index',
         'cluster_target': 'target_cluster'}
 
+    @property
+    def code_details(self):
+        return self.code_table[['code', 'secShortName', 'industry']]
+
     def __init__(self):
         put_failure_path(get_error_path)
         self._create_all_folders()
         self.code_table = pd.read_csv(self.CODE_LIST_PATH, encoding=GBK)
-        self.active_table = self.code_table[self.code_table.stop == False]
+        std_code_col_inplace(self.code_table)
+        self.code_table.index = self.code_table.code
         self.code_list = self.code_table['code']
         folder = DATA_ROOT + self.DATA_FOLDERS['index']
         codes = re.compile(r'(\d+)')
@@ -77,6 +89,9 @@ class _DataManager:
 
         DMGR.code_table['stop'] = DMGR.code_table.code.apply(__if_stop)
         DMGR.code_table.to_csv(DMGR.CODE_LIST_PATH, encoding=GBK, index=False)
+
+    def code_name(self, code):
+        return self.code_table.loc[code, 'secShortName']
 
     def _create_all_folders(self):
         for key in self.DATA_FOLDERS:
@@ -177,14 +192,8 @@ class _DataManager:
         DMGR.save(new, category, code, if_object2str=True)
         return new
 
-    def loop_stocks(self, func: object, flag: str, num_process: int = 4, limit: int = -1) -> object:
-        return loop(func, self.code_list, num_process=num_process, flag=flag, limit=limit)
-
-    def loop_index(self, func, flag, num_process=4, limit=-1):
-        return loop(func, self.idx_list, num_process=num_process, flag=flag, limit=limit)
-
     def category_concat(self, code_list, category, columns, start_date):
-        tid = category + '_concat' + uid()
+        tid = category + uid()
         setattr(self, tid, pd.DataFrame())
 
         def _concat_code(code):
@@ -322,7 +331,7 @@ class _DataWasher:
             obj2file(self.match_path, self.matched)
         return matches
 
-    def column_select(self, df):
+    def column_select(self, df, code=''):
         keys = {}
         cols_id = [[x.split(self.DUPLICATE_SEPARATOR)[0], x] for x in df.columns]
         for idx, col in cols_id:
@@ -339,7 +348,7 @@ class _DataWasher:
                     if field in df:
                         df.drop(field, axis=1, inplace=True)
                 elif idx != field:
-                    column_compare_choose_inplace(df, idx, field, flag=f"{idx} vs {field}")
+                    column_compare_choose_inplace(df, idx, field, flag=f"{code} duplicate {field}")
         return df
 
     # endregion
@@ -365,60 +374,6 @@ class _DataWasher:
                 self.mapper.ix[row[0], 'alias'] = new_alias
                 print(new_alias)
 
-    def fill(self):
-        code = 1
-        df = get_line_backup(code)
-
-    # endregion
-
-    # noinspection PyTypeChecker
-    @staticmethod
-    def percentage_factor_by_values(series: pd.Series):
-        series.dropna(inplace=True)
-        if np.all(series < 1):
-            return 1
-        if np.all(series > 2):
-            return 100
-        raise Exception('Can not determine percentage factor!')
-
-    @staticmethod
-    def ttm_column(df, column, new_column=None, n=4):
-        new_col = column + TTM_SUFFIX if new_column is None else new_column
-        df[new_col] = 0
-        if 'quarter' not in df:
-            print('no quarter given, aborted!')
-            return None
-
-        df = df.sort_values('quarter')
-        if n == 2:
-            col = df[column].fillna(method='pad')
-            df['quart'] = df['quarter'].apply(lambda x: x.split(QUARTER_SEPARATOR)[1])
-            last_col = 'last' + column
-            df[last_col] = col.shift(1)
-
-            def ttm2(row):
-                cur = row[column]
-                last_val = row[last_col]
-                res = cur if row['quart'] == '1' else cur - last_val
-                return res if cur > 0 else last_val if last_val > 0 else np.nan
-
-            ttm_list = df.apply(ttm2, axis=1)
-            ttm_list.fillna(method='pad', inplace=True)
-        else:
-            last = [0, 0, 0, 0, 0]
-
-            def get_ttm(row, last_val_list):
-                cur = row[column]
-                year_quarter = row['quarter']
-                _, quarter = year_quarter.split(QUARTER_SEPARATOR)
-                quarter = int(quarter)
-                ttm = cur + last_val_list[4] - last_val_list[quarter]
-                last_val_list[quarter] = cur
-                return ttm
-
-            ttm_list = df.apply(lambda row: get_ttm(row, last), axis=1)
-        return ttm_list
-
     @staticmethod
     def ttm_dict(val_dict):
         if len(val_dict) == 2:
@@ -441,6 +396,74 @@ class _DataWasher:
             ttm = val + last[4] - last[quarter]
             last[quarter] = val
         return ttm
+
+    # endregion
+
+    # noinspection PyTypeChecker
+    @staticmethod
+    def percentage_factor_by_values(series: pd.Series):
+        series.dropna(inplace=True)
+        if np.all(series < 1):
+            return 1
+        if np.all(series > 2):
+            return 100
+        raise Exception('Can not determine percentage factor!')
+
+    @staticmethod
+    def ttm_column(df, column, new_column=None, n=4):
+        new_col = column + TTM_SUFFIX if new_column is None else new_column
+        df[new_col] = 0
+        if 'quarter' not in df:
+            print('no quarter given, aborted!')
+            return None
+        if 'quart' not in df:
+            df['quart'] = df['quarter'].apply(lambda x: x.split(QUARTER_SEPARATOR)[1])
+        df = df.sort_values('quarter')
+        if n == 2:
+            # col = df[column].fillna(method='pad')
+            last_col = 'last' + column
+            df[last_col] = df[column].shift(1)
+
+            def ttm2(row):
+                cur = row[column]
+                cur = cur if cur == cur else 0
+                last_val = row[last_col]
+                last_val = last_val if last_val == last_val else 0
+                res = cur if row['quart'] == '1' else cur - last_val
+                if cur * last_val == 0:
+                    max_val = max(cur, last_val)
+                    if max_val == 0:
+                        val = np.nan
+                    else:
+                        val = max_val / 2
+                else:
+                    val = res
+                return val
+
+            ttm_list = df.apply(ttm2, axis=1)
+            # ttm_list.fillna(method='pad', inplace=True)
+        else:
+            last = [0, 0, 0, 0, 0]
+            last_ttm = [0, 0, 0, 0, 0]
+
+            def get_ttm(row, last_val_list, last_ttm_list):
+                cur = row[column]
+                cur = cur if cur == cur else 0
+                # year_quarter = row['quarter']
+                quarter = row['quart']
+                quarter = int(quarter)
+                if cur == 0 and last_val_list[quarter] == 0:
+                    last_quarter = quarter - 1 if quarter != 1 else 4
+                    ttm = last_ttm_list[last_quarter]
+                    last_val_list[quarter] = 0
+                else:
+                    last_ttm_list[quarter] = ttm = cur + last_val_list[4] - last_val_list[quarter]
+                    last_val_list[quarter] = cur
+                return ttm
+
+            ttm_list = df.apply(lambda row: get_ttm(row, last, last_ttm), axis=1)
+            # print(df[column], ttm_list)
+        return ttm_list
 
     @staticmethod
     def calc_change(df: pd.DataFrame):
@@ -503,7 +526,7 @@ class _DataWasher:
 
             # raise Exception('missed')
 
-        loop(fill, code_list, num_process=5, flag='fill_tick_missed')
+        loop(fill, code_list, num_process=5)
 
     @staticmethod
     def all_lines_fill_derc(category='stock', code_list=None):
@@ -519,7 +542,7 @@ class _DataWasher:
             df = DWASH.fill_derc(df)
             DMGR.save(df, category, code)
 
-        loop(fill, code_list, flag='stock_line_derc_fill', num_process=7)
+        loop(fill, code_list, num_process=7)
 
 
 DWASH = _DataWasher()

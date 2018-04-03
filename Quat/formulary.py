@@ -126,6 +126,10 @@ class _FinancialFormula(metaclass=SingletonMeta):
                 df = df.drop(idx, axis=1)
         return df
 
+    @property
+    def cluster_targets(self):
+        return self.sub_targets[KPI] + self.sub_targets[POLICY]
+
     def __init__(self):
         # get table-field relation pairs for further use, table of *_indicator excluded
         self._table_fields = {row.field: row.table for i, row in DWASH.mapper.iterrows() if
@@ -227,8 +231,9 @@ class _FinancialFormula(metaclass=SingletonMeta):
                 return pre_eqt, pre_fields
 
             def target_calc(df, field_name, new_field_name, periods):
-                _ = df, new_field_name, periods
+                """calculate target first, then ttm as required"""
                 target_calculator(field_name)
+                ttm(df, field_name, new_field_name, periods)
 
             def balance(df, field_name, new_field_name, periods):
                 df[new_field_name] = df[field_name].rolling(periods).apply(
@@ -254,22 +259,19 @@ class _FinancialFormula(metaclass=SingletonMeta):
                 if table == 'history':
                     new_fields.append(field)
                 else:
-                    new_field = field if table == FORMULA_TARGET else field + TTM_SUFFIX + str(
-                            num_quarters)
+                    new_field = field + TTM_SUFFIX + str(num_quarters)
                     # for target, force re-calculate
                     if new_field not in data or table == FORMULA_TARGET:
                         tb2prelude[table](data, field, new_field, num_quarters)
                     new_fields.append(new_field)
                     pre_eqt = pre_eqt.replace(field, new_field)
             if self.If_Debug:
-                print(data[new_fields])
+                print(data[[*pre_fields, *new_fields]])
             return pre_eqt, new_fields
 
         eqt, fields = _prelude()
         if eqt is None:
             return None
-        if self.If_Debug:
-            print(data[fields])
 
         eqt_series = data.eval(eqt, parser='pandas')
         if formula.finale != formula.finale:
@@ -490,12 +492,14 @@ class Stocks(Ticks):
     DATA_SOURCE = 'stock'
     TICK_SOURCE = 'lines'
     SIMPLE_COLUMNS = ['date', 'quarter', 'open', 'high', 'low', 'close', 'factor', 'derc_close',
-                      'volume', 'market_cap']
+                      'volume', 'market_cap', 'i_close', 'i_high', 'i_low', 'i_open']
     ACTIVE_TIME_LINE = std_date_str(today().year - 2, 1, 1)
 
     @classmethod
     def simplify_line(cls, code):
         df = DMGR.read('stock', code)
+        df = DWASH.fill_derc(df)
+        DMGR.save_csv(df, 'stock', code)
         if df is None or df.empty:
             return
         if date_str2std(df.iloc[-1].date) < cls.ACTIVE_TIME_LINE:
@@ -509,15 +513,17 @@ class Stocks(Ticks):
 
     @classmethod
     def simplify_all_lines(cls, code_list=None):
-        loop(cls.simplify_line, code_list, flag='simple_lines', num_process=7)
+        loop(cls.simplify_line, code_list, num_process=7)
         # DMGR.loop_stocks(cls.simplify_line, 'simple_line')
 
     @classmethod
     def target_pipeline(cls, target_list=None):
+        target_list = target_list if target_list else FORMULA.sub_targets[KPI]
         cls.targets_calculate(target_list)
         cls.targets_stock2cluster(target_list)
-        cls.cluster_spread(target_list)
+        cls.targets_cluster_spread(target_list)
         cls.targets_cluster2stock(target_list)
+        cls.targets_cluster2csv(target_list)
 
     # region target
 
@@ -531,7 +537,7 @@ class Stocks(Ticks):
             stk.calc_list(target_list)
             stk.save_targets()
 
-        loop(calc, code_list, flag='target_calc', num_process=5)
+        loop(calc, code_list, num_process=5)
 
     @classmethod
     def targets_stock2cluster(cls, target_list=None, code_list=None):
@@ -610,16 +616,16 @@ class Stocks(Ticks):
 
         n = 5
         arr_list = np.array_split(code_list, n)
-        results = loop(combine_stocks, arr_list, flag='stock_target_combine', num_process=n)
+        results = loop(combine_stocks, arr_list, num_process=n)
 
-        loop(cluster_stat, target_list, num_process=n, flag='cluster_target_stat')
+        loop(cluster_stat, target_list, num_process=n, flag='_stat')
 
     @classmethod
     def targets_cluster2stock(cls, target_list=None, code_list=None):
         """save market-wide statistic result back to stocks' target table
         :return:
         """
-        target_list = target_list if target_list else FORMULA.sub_targets[KPI]
+        target_list = target_list if target_list else FORMULA.cluster_targets
         code_list = DMGR.code_list if code_list is None else code_list
         target_dfs = DMGR.read2dict('cluster_target', target_list, idx_by_quarter)
 
@@ -646,10 +652,12 @@ class Stocks(Ticks):
             # df = pd.merge(df, comb, on='quarter', how='left')
             DMGR.save(df, 'stock_target', code)
 
-        loop(cluster_separate_by_code, code_list, num_process=5, flag='cluster_separate2stock')
+        loop(cluster_separate_by_code, code_list, num_process=5)
 
     @classmethod
-    def cluster_spread(cls, target_list):
+    def targets_cluster_spread(cls, target_list=None):
+        target_list = target_list if target_list else FORMULA.cluster_targets
+
         def spread(target):
             df = DMGR.read('cluster_target', target)
             df.index = df.quarter
@@ -668,7 +676,25 @@ class Stocks(Ticks):
                 sub.rename(columns=column_transactions, inplace=True)
                 DMGR.save(sub, 'cluster_target', target + tail)
 
-        loop(spread, target_list, num_process=4, flag='cluster_target_spread')
+        loop(spread, target_list, num_process=4)
+
+    @classmethod
+    def targets_cluster2csv(cls, target_list=None):
+        target_list = target_list if target_list else FORMULA.cluster_targets
+
+        def transpose(code):
+            for tail in ['', PERCENTILE, STD_DISTANCE]:
+                df = DMGR.read('cluster_target', code + tail)
+                df.index = df.quarter
+                df.sort_index(ascending=False, inplace=True)
+                df.drop('quarter', axis=1, inplace=True)
+                df = df.T
+                # df.reset_index(inplace=True)
+                # DWASH.std_code_col_inplace(df)
+                df = pd.merge(DMGR.code_details, df, left_index=True, right_index=True, how='inner')
+                DMGR.save_csv(df, 'cluster_target', code + tail)
+
+        loop(transpose, target_list, num_process=5)
 
     # endregion
 
@@ -677,6 +703,7 @@ class Stocks(Ticks):
             def __no_read(flag):
                 print(self.DATA_SOURCE, code, flag, 'is empty')
                 return None, None
+
             report = None
             for table in ['balance', 'cash_flow', 'income']:
                 df = DMGR.read(table, self.code)
@@ -696,7 +723,7 @@ class Stocks(Ticks):
                 else:
                     return __no_read(table)
             if report is not None and not report.empty:
-                report = DWASH.column_select(report)
+                report = DWASH.column_select(report, code)
                 report.index = report.quarter
                 report.sort_index(inplace=True)
                 # some column's dtype is read as object, change to number

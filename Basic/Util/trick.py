@@ -61,6 +61,11 @@ def min_at(array, evaluate_func, limit_func=None, show=False):
     return max_at(array, lambda x: -1 * evaluate_func(x), limit_func, show)
 
 
+def func_name_from_stack(idx=-1):
+    import traceback
+    return traceback.extract_stack()[idx][2]
+
+
 class Counter(object):
 
     def __init__(self, step=1):

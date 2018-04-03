@@ -10,6 +10,7 @@ from Basic.Util import print_num
 from .formulary import *
 
 PRICE_TAG = '_price'
+NON_RISK_RETURN = 0.01
 
 
 class Strategy:
@@ -101,10 +102,7 @@ class Strategy:
             return earn
 
         r = share.apply(return_calc, axis=1)
-        draw_vs_benchmark(r)
-
-
-NON_RISK_RETURN = 0.01
+        # draw_vs_benchmark(r)
 
 
 def cumulative_sharp(earns):
@@ -115,28 +113,94 @@ def cumulative_sharp(earns):
     return cum_yield, sharp
 
 
-def draw_vs_benchmark(earn_series):
-    earn_col = 'yield'
-    benchmark_col = 'benchmark'
-    cum_yield = 'Policy'
-    cum_benchmark = 'HS300'
-    earn_series.name = earn_col
-    df = earn_series.reset_index()
-    df.index = df.quarter
-    df[benchmark_col] = Indexes.hs300.quarter_performance()
-    print(df[benchmark_col])
-    plt.close('all')
+class _GraphReport:
 
-    fig, ax = plt.subplots()
+    def _setup(self):
+        plt.close('all')
+        plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
+        plt.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
+        self.figure = plt.figure(figsize=(8, 6))
+        # self.figure
+        # self.data = pd.DataFrame()
 
-    def draw_cum(yield_col, cum_col):
-        df[cum_col], my_sharp = cumulative_sharp(df[yield_col])
-        ax.plot(df[cum_col], label=f"{cum_col}  Sharp:{my_sharp:{4}.{2}}")
+    def _get_subplot(self, pos):
+        ax = self.figure.add_subplot(pos)
 
-    draw_cum(earn_col, cum_yield)
-    draw_cum(benchmark_col, cum_benchmark)
+        return ax
 
-    ax.set_xticklabels(df.index, rotation=45, fontsize=7)
-    plt.legend(loc='upper left', frameon=False)
-    plt.tight_layout()
-    plt.show()
+    def show(self):
+        plt.tight_layout()
+        plt.show()
+
+    def draw_vs_benchmark(self, earn_series):
+        earn_col = 'yield'
+        benchmark_col = 'benchmark'
+        cum_yield = 'Policy'
+        cum_benchmark = 'HS300'
+        earn_series.name = earn_col
+        df = earn_series.reset_index()
+        df.index = df.quarter
+        df[benchmark_col] = Indexes.hs300.quarter_performance()
+        print(df[benchmark_col])
+
+        def _draw(fig, ax):
+            def draw_cum(yield_col, cum_col):
+                df[cum_col], my_sharp = cumulative_sharp(df[yield_col])
+                ax.plot(df[cum_col], label=f"{cum_col}  Sharp:{my_sharp:{4}.{2}}")
+
+            draw_cum(earn_col, cum_yield)
+            draw_cum(benchmark_col, cum_benchmark)
+
+            ax.set_xticklabels(df.index, rotation=45, fontsize=7)
+
+    def analysis(self, code):
+        self._setup()
+
+        def ax_plot(axes, col, label=None, color=None):
+            label = label if label else col
+            axes.plot(self.data[col], label=label, color=color)
+
+        self.data = df = DMGR.read('stock_target', code)
+        df.index = df.quarter
+        df['PEG'] = df['PEG'] / 100
+
+        def profit():
+            ax = self._get_subplot(211)
+
+            ax.set_title(code + u'  %s' % DMGR.code_name(code))
+            ax_plot(ax, 'PE', color='black')
+
+            ax2 = ax.twinx()
+
+            ax2.yaxis.grid(True, which='major')
+            ax2.set_ylim([-0.2, 2])
+            ax_plot(ax2, 'ROE')
+
+            ax_plot(ax2, 'PG', 'ProfitGrowth')
+            ax_plot(ax2, 'PEG')
+
+            ax.legend(loc='upper left', frameon=False)
+            ax2.legend(loc='upper right', frameon=False)
+            n = 1
+            # ax.xaxis.set_major_locator(ticker.IndexLocator(1, 0))
+            lb = df.quarter[::n]
+            ax.set_xticklabels(lb, rotation=45, fontsize=7)
+
+        def quality():
+            ax = self._get_subplot(212)
+            ax_plot(ax, 'GrossMargin')
+            ax_plot(ax, 'ATO')
+            ax_plot(ax, 'DSRI')
+            ax_plot(ax, 'AccrualRatio')
+
+            ax.legend(loc='upper right', frameon=False)
+            lb = df.quarter[::1]
+            # ax.set_ylim([-0.5, 2])
+            ax.set_xticklabels(lb, rotation=45, fontsize=7)
+
+        profit()
+        quality()
+        self.show()
+
+
+Graph = _GraphReport()
