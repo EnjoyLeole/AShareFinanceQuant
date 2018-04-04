@@ -245,7 +245,7 @@ DMGR = _DataManager()
 
 
 class _DataWasher:
-    COLUMN_UPDATE = True
+    COLUMN_UPDATE = False
     DUPLICATE_SEPARATOR = '~'
     DUPLICATE_FLAG = '*2'
 
@@ -315,7 +315,7 @@ class _DataWasher:
                 if self.COLUMN_UPDATE:
                     self.mapper.ix[key, 'matchCount'] += 1
                     self.mapper.ix[key, 'matches'] += '%s %s ' % (col, category)
-                    self.mapper.to_csv('D:/field_mapper.csv', encoding=GBK)
+                    self.mapper.to_csv('C:/field_mapper.csv', encoding=GBK)
             else:
                 if np.all(col != self.mapper['field']):
                     if col_name not in ['index']:
