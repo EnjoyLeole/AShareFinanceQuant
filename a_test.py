@@ -5,6 +5,7 @@ import numpy
 from Basic.Ext3PL import force_debug
 from Basic.IO import file2obj
 from Basic.Util import date_of, save_pkg_list
+from Meta import META_DIR
 from Quat.statistic import *
 from Quat.webio import N163, WebCrawler
 
@@ -227,8 +228,6 @@ def wechat(who='filehelper'):
     itchat.send('Hello, message from python', toUserName=who)
     friends=itchat.get_friends()
     to(friends[0])
-    liuyu=itchat.search_friends(name='ideerliu')
-    to(liuyu)
     rooms=itchat.get_chatrooms()
     to(rooms[0].UserName)
     # itchat.send('Hello, message from python', toUserName='filehelper')
@@ -320,7 +319,7 @@ def error_reshow(f):
 def test():
     # force()
     code = '000786'
-    # wechat('ideerliu')
+    print('root', META_DIR)
     WebCrawler.everything()
     # save_pkg_list()
     # stock_vector_test(code)
