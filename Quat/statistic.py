@@ -119,7 +119,7 @@ class _GraphReport:
         plt.close('all')
         plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
         plt.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
-        self.figure = plt.figure(figsize=(8, 6))
+        self.figure = plt.figure(figsize=(8, 16))
         # self.figure
         # self.data = pd.DataFrame()
 
@@ -140,6 +140,7 @@ class _GraphReport:
         earn_series.name = earn_col
         df = earn_series.reset_index()
         df.index = df.quarter
+
         df[benchmark_col] = Indexes.hs300.quarter_performance()
         print(df[benchmark_col])
 
@@ -153,53 +154,108 @@ class _GraphReport:
 
             ax.set_xticklabels(df.index, rotation=45, fontsize=7)
 
+    @staticmethod
+    def draw_line(df, ax, col, label=None, color=None, if_percent=False):
+        label = label if label else col
+        line = ax.plot(df[col].values, label=label, color=color)
+        color=line[0].get_color()
+        x = df[col].size
+        latest_val = df[col].iloc[-1]
+        label = ('%.1f' % (latest_val * 100)) + '%' if if_percent else '%.2f' % latest_val
+        ax.annotate(label, xy=(x - 2, latest_val),  xycoords='data',color=color)
+
+    @staticmethod
+    def draw_dict(df, ax, dict, if_percent=False):
+        if 'title' in dict:
+            ax.set_title(dict['title'])
+        for col in dict['lines']:
+            line = dict['lines'][col]
+            label = line['label'] if 'label' in line else None
+            color = line['color'] if 'color' in line else None
+            Graph.draw_line(df, ax, col, label=label, color=color, if_percent=if_percent)
+
+    def draw_left(self, df, seq, dict1, if_percent=True):
+        ax = self._get_subplot(seq)
+
+        self.draw_dict(df, ax, dict1, if_percent)
+
+        ax.yaxis.grid(True, which='both', alpha=0.2)
+        lb = df.quarter[::1]
+        # x=[i for i in range(lb.size)]
+        # print(lb.size)
+        ax.set_xticks(range(lb.size))
+
+        ax.set_xticklabels(labels=lb.values, rotation=45, fontsize=7)
+        ax.legend(loc='upper left', frameon=False)
+        if if_percent:
+            ax.set_yticklabels(['{:.0f}%'.format(x * 100) for x in ax.get_yticks()])
+        return ax
+
+    def draw_twin(self, df, seq, dict1, dict2, if_percent=True):
+        left_ax = self.draw_left(df, seq, dict1, if_percent=False)
+        left_ax.yaxis.grid(False)
+        ax = left_ax.twinx()
+        self.draw_dict(df, ax, dict2, if_percent)
+        ax.yaxis.grid(True, which='both', alpha=0.2)
+        # # ax2.set_ylim([-0.5, 2])
+
+        ax.legend(loc='upper right', frameon=False)
+        if if_percent:
+            ax.set_yticklabels(['{:.0f}%'.format(x * 100) for x in ax.get_yticks()])
+        # ax2.set_xticks(x)
+        # ax.xaxis.set_major_locator(ticker.IndexLocator(1, 0))
+
     def analysis(self, code):
         self._setup()
 
-        def ax_plot(axes, col, label=None, color=None):
-            label = label if label else col
-            axes.plot(self.data[col], label=label, color=color)
-
-        self.data = df = DMGR.read('stock_target', code)
+        df = DMGR.read('stock_target', code)
         df.index = df.quarter
-        df['PEG'] = df['PEG'] / 100
-
-        def profit():
-            ax = self._get_subplot(211)
-
-            ax.set_title(code + u'  %s' % DMGR.code_name(code))
-            ax_plot(ax, 'PE', color='black')
-
-            ax2 = ax.twinx()
-
-            ax2.yaxis.grid(True, which='major')
-            ax2.set_ylim([-0.2, 2])
-            ax_plot(ax2, 'ROE')
-
-            ax_plot(ax2, 'PG', 'ProfitGrowth')
-            ax_plot(ax2, 'PEG')
-
-            ax.legend(loc='upper left', frameon=False)
-            ax2.legend(loc='upper right', frameon=False)
-            n = 1
-            # ax.xaxis.set_major_locator(ticker.IndexLocator(1, 0))
-            lb = df.quarter[::n]
-            ax.set_xticklabels(lb, rotation=45, fontsize=7)
-
-        def quality():
-            ax = self._get_subplot(212)
-            ax_plot(ax, 'GrossMargin')
-            ax_plot(ax, 'ATO')
-            ax_plot(ax, 'DSRI')
-            ax_plot(ax, 'AccrualRatio')
-
-            ax.legend(loc='upper right', frameon=False)
-            lb = df.quarter[::1]
-            # ax.set_ylim([-0.5, 2])
-            ax.set_xticklabels(lb, rotation=45, fontsize=7)
-
-        profit()
-        quality()
+        df = df[df.index > '2009Q4']
+        name = code + u'  %s ' % DMGR.code_name(code)
+        self.draw_twin(df, 411,
+                       {
+                           'title': name + "估值水平",
+                           'lines': {
+                               'PE': {'color': 'black'},
+                               }
+                           }, {
+                           'lines': {
+                               'SaleGrowth': {},
+                               'PG':         {'label': 'ProfitGrowth'},
+                               'PEG':        {}
+                               }
+                           })
+        self.draw_left(df, 412,
+                       {
+                           'title': name + '盈利能力(杜邦分析)',
+                           'lines': {
+                               'ATO_Yearly':  {},
+                               'ROE':         {},
+                               'GrossMargin': {}
+                               }
+                           })
+        self.draw_left(df, 413,
+                       {
+                           'title': name + '盈利质量',
+                           'lines': {
+                               'ReceivableRatio': {},
+                               'PayableRatio':    {},
+                               'AccrualRatio':    {}
+                               }
+                           })
+        self.draw_twin(df, 414,
+                       {
+                           'title': name + '财务风险',
+                           'lines': {
+                               'MscoreRegular': {},
+                               'ZscoreRegular': {}
+                               }
+                           },
+                       {
+                           'lines': {
+                               'PFD_percentile': {'color': 'pink'}
+                               }
+                           })
         self.show()
 
 

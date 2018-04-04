@@ -232,10 +232,11 @@ class _FinancialFormula(metaclass=SingletonMeta):
 
             def target_calc(df, field_name, new_field_name, periods):
                 """calculate target first, then ttm as required"""
-                target_calculator(field_name)
-                ttm(df, field_name, new_field_name, periods)
+                df[new_field_name] = target_calculator(field_name, prelude)
+                # ttm(df, field_name, new_field_name, periods)
 
             def balance(df, field_name, new_field_name, periods):
+                df[field_name].fillna(0, inplace=True)
                 df[new_field_name] = df[field_name].rolling(periods).apply(
                         lambda li: (li[0] + li[-1]) / 2)
 
@@ -261,7 +262,7 @@ class _FinancialFormula(metaclass=SingletonMeta):
                 else:
                     new_field = field + TTM_SUFFIX + str(num_quarters)
                     # for target, force re-calculate
-                    if new_field not in data or table == FORMULA_TARGET:
+                    if new_field not in data:
                         tb2prelude[table](data, field, new_field, num_quarters)
                     new_fields.append(new_field)
                     pre_eqt = pre_eqt.replace(field, new_field)
@@ -356,7 +357,8 @@ class Ticks(object):
             return None
         formula = formula if formula is not None else FORMULA.table.loc[target]
         prelude = formula.prelude if prelude != prelude else prelude
-        target_calculator = lambda tar: self.calc_target(target=tar)
+        target_calculator = lambda tar, prelude=np.nan: \
+            self.calc_target(target=tar, prelude=prelude, if_renew=True)
         if formula.source == TICK:
             # for daily tick, insert into self.tick first, then reduce to self.data
             if target not in self.formulas.index:
@@ -392,14 +394,6 @@ class Ticks(object):
             return
         cols2save = [x for x in FORMULA.target_savings if x in self.major]
         targets = self.major[cols2save]
-        # if self.if_renew:
-        #     # for renew, must read existed targets to avoid lost data
-        #     old_targets = DMGR.read(self.target_source, self.code)
-        #     if old_targets is not None and not old_targets.empty:
-        #         cols2drop = [col for col in cols2save if col in old_targets]
-        #         old_targets.drop(cols2drop, axis=1, inplace=True)
-        #         targets = pd.merge(targets, old_targets, left_index=True, right_on='quarter',
-        #                            how='left')
         DMGR.save(targets, self.target_source, self.code)
         if if_tick:
             self.save_ticks()

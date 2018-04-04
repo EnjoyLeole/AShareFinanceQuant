@@ -38,7 +38,6 @@ def std_code_col_inplace(df):
 
 
 class _DataManager:
-    CODE_LIST_PATH = DATA_ROOT + 'my_code_list.csv'
     DATA_FOLDERS = {
         '':               '',
         'indicator':      'financial_indicator',
@@ -62,7 +61,7 @@ class _DataManager:
     def __init__(self):
         put_failure_path(get_error_path)
         self._create_all_folders()
-        self.code_table = pd.read_csv(self.CODE_LIST_PATH, encoding=GBK)
+        self.code_table = get_lib('code_table')
         std_code_col_inplace(self.code_table)
         self.code_table.index = self.code_table.code
         self.code_list = self.code_table['code']
@@ -87,8 +86,9 @@ class _DataManager:
                         return False
             return True
 
+        CODE_LIST_PATH = DATA_ROOT + 'my_code_list.csv'
         DMGR.code_table['stop'] = DMGR.code_table.code.apply(__if_stop)
-        DMGR.code_table.to_csv(DMGR.CODE_LIST_PATH, encoding=GBK, index=False)
+        DMGR.code_table.to_csv(CODE_LIST_PATH, encoding=GBK, index=False)
 
     def code_name(self, code):
         return self.code_table.loc[code, 'secShortName']
@@ -425,6 +425,7 @@ class _DataWasher:
             df[last_col] = df[column].shift(1)
 
             def ttm2(row):
+                # todo how about non-continous quarter?
                 cur = row[column]
                 cur = cur if cur == cur else 0
                 last_val = row[last_col]

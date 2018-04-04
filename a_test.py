@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 import itchat
 import numpy
-from sympy.physics.quantum.circuitplot import matplotlib
 
 from Basic.Ext3PL import force_debug
 from Basic.IO import file2obj
-from Basic.Util import date_of
+from Basic.Util import date_of, save_pkg_list
 from Quat.statistic import *
 from Quat.webio import N163, WebCrawler
 
@@ -221,12 +220,22 @@ def force():
     FORMULA.If_Debug = True
 
 
-def wechat():
+def wechat(who='filehelper'):
     itchat.auto_login()
+    def to(user):
+        itchat.send('Hello, message from python', toUserName=user)
+    itchat.send('Hello, message from python', toUserName=who)
+    friends=itchat.get_friends()
+    to(friends[0])
+    liuyu=itchat.search_friends(name='ideerliu')
+    to(liuyu)
+    rooms=itchat.get_chatrooms()
+    to(rooms[0].UserName)
+    # itchat.send('Hello, message from python', toUserName='filehelper')
+    room=itchat.search_chatrooms(name='股票与基金交流')
+    to(room[0].UserName)
 
-    itchat.send('Hello, filehelper', toUserName='filehelper')
-
-
+    # itchat.send('Hello, message from python', toUserName='股票与基金交流')
 def df_test():
     # d=pd.Series([np.nan,1,np.nan,4,np.nan])
     # print(d.fillna(method='bfill'))
@@ -273,9 +282,11 @@ def stock_vector_test(code=hr, target=None):
     stk = Stocks(code)
     if target is None:
         df_res = stk.calc_list()
+
         stk.save_targets()
     else:
         res = stk.calc_target(target=target)
+        # print(stk.major['depreciation'])
         stk.save_targets()
         print(res)
 
@@ -307,19 +318,22 @@ def error_reshow(f):
 
 
 def test():
-    code='300072'
-    # print(matplotlib.matplotlib_fname())
+    # force()
+    # code = '000786'
+    # wechat('ideerliu')
+
+    save_pkg_list()
+    # stock_vector_test(code)
     # Graph.analysis(code)
-    force()
+
     # Stocks.targets_cluster2stock()
     # error_reshow('targets_calculate')
 
     # N163.override_finance(bcode)
-    stock_vector_test('300072','AccrualRatio')
 
     # Stocks.target_pipeline()
 
-    # DMGR.feather2csv('stock_target', '300072')
+    # DMGR.feather2csv('stock_target', code)
 
     # Strategy.find_security( )
 
