@@ -10,10 +10,11 @@ META_DIR = os.path.dirname(os.path.abspath(__file__)) + '\\'
 DATA_ROOT = 'C:\\StockData\\'
 BACKUP_DIR = META_DIR + 'Old\\lines\\'
 lib_path = {
-    'code_table': META_DIR + 'my_code_list.csv',
-    'mapper':    META_DIR + 'field_mapper.csv',
-    'formula':   META_DIR + 'formula.csv',
-    'matched':   DATA_ROOT + 'matched.json'}
+    'code_table':  META_DIR + 'my_code_list.csv',
+    'index_table': META_DIR + 'index_list.csv',
+    'mapper':      META_DIR + 'field_mapper.csv',
+    'formula':     META_DIR + 'formula.csv',
+    'matched':     DATA_ROOT + 'matched.json'}
 lib = {}
 
 

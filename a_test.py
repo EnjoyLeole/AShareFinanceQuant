@@ -319,10 +319,10 @@ def error_reshow(f):
 
 def test():
     # force()
-    # code = '000786'
+    code = '000786'
     # wechat('ideerliu')
-
-    save_pkg_list()
+    WebCrawler.everything()
+    # save_pkg_list()
     # stock_vector_test(code)
     # Graph.analysis(code)
 

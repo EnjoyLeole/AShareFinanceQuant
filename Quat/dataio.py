@@ -67,11 +67,13 @@ class _DataManager:
         self.code_list = self.code_table['code']
         folder = DATA_ROOT + self.DATA_FOLDERS['index']
         codes = re.compile(r'(\d+)')
-        self.idx_list = []
-        for file_name in os.listdir(folder):
-            # print(1)
-            code = codes.search(file_name)[0]
-            self.idx_list.append(code)
+        self.idx_list = get_lib('index_table')['code'].apply(lambda x:str(x).zfill(6)).values
+        # for file_name in os.listdir(folder):
+        #     # print(1)
+        #     code = codes.search(file_name)[0]
+        #     self.idx_list.append(code)
+        # df=pd.DataFrame(self.idx_list)
+        # df.to_csv(lib_path['index_table'])
 
     @staticmethod
     def __financial_report_sustaining_check():
