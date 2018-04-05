@@ -62,10 +62,10 @@ class N163(object):
     # 0 for index   1 for stock
     url_his = "http://quotes.money.163.com/service/chddata.html?code=%s%s&start=%s"
     url_finance = {
-        "indicator": "https://quotes.money.163.com/service/zycwzb_%s.html?type=report",
-        "balance":   "https://quotes.money.163.com/service/zcfzb_%s.html",
-        "income":    "https://quotes.money.163.com/service/lrb_%s.html",
-        "cash_flow": "https://quotes.money.163.com/service/xjllb_%s.html"}
+        "indicator": "http://quotes.money.163.com/service/zycwzb_%s.html?type=report",
+        "balance":   "http://quotes.money.163.com/service/zcfzb_%s.html",
+        "income":    "http://quotes.money.163.com/service/lrb_%s.html",
+        "cash_flow": "http://quotes.money.163.com/service/xjllb_%s.html"}
 
     right = ['kline', 'klinederc']
     period = ['day', 'week', 'month']
