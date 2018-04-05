@@ -319,8 +319,10 @@ def error_reshow(f):
 def test():
     # force()
     code = '000786'
-    print('root', META_DIR)
-    WebCrawler.everything()
+    WebCrawler.override_finances()
+
+    # print('root', META_DIR)
+    # WebCrawler.everything()
     # save_pkg_list()
     # stock_vector_test(code)
     # Graph.analysis(code)

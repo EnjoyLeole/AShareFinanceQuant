@@ -30,11 +30,15 @@ def code2symbol(code):
     return code + '.' + tail
 
 
-def std_code_col_inplace(df):
+def get_std_code_table():
+    df = get_lib('code_table')
+    # get_std_code_table(table)
+    df.index = df.code
     if 'code' not in df:
         print('code not in df!')
         return
     df['code'] = df['code'].apply(lambda val: str(val).zfill(6))
+    return df
 
 
 class _DataManager:
@@ -61,13 +65,12 @@ class _DataManager:
     def __init__(self):
         put_failure_path(get_error_path)
         self._create_all_folders()
-        self.code_table = get_lib('code_table')
-        std_code_col_inplace(self.code_table)
-        self.code_table.index = self.code_table.code
+        table=get_std_code_table()
+        self.code_table = table[table.if_index == 0]
         self.code_list = self.code_table['code']
-        folder = DATA_ROOT + self.DATA_FOLDERS['index']
-        codes = re.compile(r'(\d+)')
-        self.idx_list = get_lib('index_table')['code'].apply(lambda x:str(x).zfill(6)).values
+        self.idx_list = table[table.if_index == 1]['code'].values
+        # folder = DATA_ROOT + self.DATA_FOLDERS['index']
+        # codes = re.compile(r'(\d+)')
         # for file_name in os.listdir(folder):
         #     # print(1)
         #     code = codes.search(file_name)[0]
